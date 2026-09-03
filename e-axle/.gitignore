@@ -1,0 +1,18 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- macOS ---
+.DS_Store
+
+# --- Ailly developer sessions ---
+# Per-topic session folders (research/design/plan/reviews) are local phase
+# tooling, not a deliverable. TASKS.md is the one long-lived record that
+# outlives a session, so it is tracked.
+.ailly/*
+!.ailly/developer/
+.ailly/developer/*
+!.ailly/developer/TASKS.md
