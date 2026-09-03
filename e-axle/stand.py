@@ -36,7 +36,7 @@ class HardwareStand:
 
     def open(self) -> None:
         # Order among controllers doesn't matter -- see README.md "Instro API
-        # quirks" (shared CAN transport). We never construct a second CanDriver.
+        # quirks" (shared CAN transport). We never construct a second CanTransport.
         for controller in self._controllers.values():
             controller.open()
         self._psu.open()

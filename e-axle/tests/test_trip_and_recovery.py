@@ -28,7 +28,7 @@ T-1 builds. See design.md, "One test, not three -- and why". The acts are
 labelled and split cleanly if a future reviewer prefers three.
 
 WHAT IT RUNS AGAINST. The same harness as the cleared feature test -- the real
-instro object graph (one CanDriver, three VESC6 drivers sharing it, three
+instro object graph (one CanTransport, three VESC6 drivers sharing it, three
 InstroMotorControllers, an InstroPSU, one HardwareStand) with only can.Bus,
 _prime_gs_usb_backend and the simulated PSU's VisaDriver patched. That harness is
 IMPORTED from tests/test_manual_control_session.py rather than duplicated: it

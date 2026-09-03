@@ -105,23 +105,23 @@ python3 -m venv .venv
 The core (`interlocks.py`, `units.py`, `session.py`, `stand.py`) needs
 nothing beyond that: they're deliberately free of any `instro` import at
 module load time. **Running the test suite in full**, however, needs
-Instro's VESC6 motor-controller driver, which currently lives on an
-unmerged branch of Nominal's private `instro` repository. It's expected to
-land in `instro-unstable` (not a stable `instro` release) once merged, so
-until a release ships with it, install from that branch's worktree instead:
+Instro's VESC6 motor-controller driver. It merged into `instro`'s `main`
+branch on 2026-09-03 (`instro#386`), but no `instro-unstable` release has
+shipped with it yet, so until one does, install from a worktree pinned to
+that commit instead:
 
 ```bash
 git clone <instro-repo-url> ../instro
-git -C ../instro fetch origin issue-362-vesc6-motor-controller-driver
-git -C ../instro worktree add ../instro-vesc6-worktree issue-362-vesc6-motor-controller-driver
+git -C ../instro fetch origin main
+git -C ../instro worktree add ../instro-worktree e7f9627
 
 uv pip install --python .venv/bin/python \
-  -e ../instro-vesc6-worktree \
-  -e ../instro-vesc6-worktree/packages/instro-unstable
+  -e ../instro-worktree \
+  -e ../instro-worktree/packages/instro-unstable
 ```
 
-Once the VESC6 driver lands in `instro-unstable` and ships a release, this
-step goes away and installing `instro-unstable` normally (as in the command
+Once a release of `instro-unstable` ships with the VESC6 driver, this step
+goes away and installing `instro-unstable` normally (as in the command
 above) is enough on its own.
 
 ## First run
@@ -294,7 +294,7 @@ driver's source/architecture, not an observed physical trial.
   (name-prefixed keys), not a plain dict; unwrapped in `get_telemetry()`.
 - `InstroPSU` has no `set_output_enabled`; the real method is
   `output_enable(enable, channel)`. This stand has exactly one PSU channel.
-- Three VESC6 drivers share one `CanDriver`: whichever opens first constructs
+- Three VESC6 drivers share one `CanTransport`: whichever opens first constructs
   the actual bus, whichever closes last tears it down. `HardwareStand`
   never constructs a second one.
 

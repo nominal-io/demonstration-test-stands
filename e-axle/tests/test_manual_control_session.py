@@ -14,7 +14,7 @@ This is the acceptance test for the manual-control MVP.
 
 WHAT IT RUNS AGAINST (design.md rev 4). There is no fake stand and no Stand
 protocol. This test builds the same object graph main.py builds -- one instro
-CanDriver, three VESC6 drivers sharing it, three InstroMotorControllers, an
+CanTransport, three VESC6 drivers sharing it, three InstroMotorControllers, an
 InstroPSU, and the one HardwareStand receiving them -- and substitutes only the
 CAN bus itself, at instro's own I/O boundary:
 
@@ -23,7 +23,7 @@ CAN bus itself, at instro's own I/O boundary:
   * instro.psu.drivers.simulated.VisaDriver         (autospec MagicMock)
 
 Everything above those three symbols is real code: TransportBase's holder
-accounting, CanDriver's send and receive demultiplexing, VESC6's frame encode
+accounting, CanTransport's send and receive demultiplexing, VESC6's frame encode
 and decode, InstroMotorController's resource lock and publish wrappers,
 HardwareStand, session.py and interlocks.py. The patch targets and the fixture
 shape are instro's own, from tests/unstable/motorcontroller/test_vesc_6.py and
@@ -75,7 +75,7 @@ from instro.psu import InstroPSU
 from instro.psu.drivers import SimulatedPSU
 from instro.unstable.motorcontroller import InstroMotorController
 from instro.unstable.motorcontroller.drivers import VESC6
-from instro.unstable.transports import CanConfig, CanDriver
+from instro.unstable.transports import CanConfig, CanTransport
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -131,7 +131,7 @@ class _Plant:
     stays quiet), everything in limits.
 
     One mechanic that is easy to get wrong: the three VESC6 drivers share one
-    CanDriver, and _drain_for() routes every frame it pulls to EVERY matching
+    CanTransport, and _drain_for() routes every frame it pulls to EVERY matching
     subscription. So on each tick the first get_telemetry() drains the whole
     batch and fans it out; the second and third find the bus empty and need only
     an immediate None. Hence: refill once per clock value, then None.
@@ -229,7 +229,7 @@ def commands_to(bus: MagicMock, node: int, packet_id: int) -> list[tuple[int, fl
 
 def build_stand(bus: MagicMock, clock: _Clock) -> HardwareStand:
     """Exactly what main.py's composition root builds, with the same values."""
-    can_driver = CanDriver(
+    can_driver = CanTransport(
         CanConfig(channel=CAN_CHANNEL, interface=CAN_INTERFACE, bitrate=CAN_BITRATE)
     )
     controllers = {
