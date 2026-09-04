@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import struct
+import sys
 import time
 from dataclasses import dataclass, field
 
@@ -49,9 +50,31 @@ from rich.text import Text
 
 try:
     import msvcrt  # Windows only
-    HAVE_KEYBOARD = True
+    _PLATFORM = "windows"
 except ImportError:
-    HAVE_KEYBOARD = False
+    import select
+    import termios
+    import tty
+    _PLATFORM = "posix"
+
+HAVE_KEYBOARD = sys.stdin.isatty()
+_posix_saved_settings = None
+
+
+def enable_raw_mode() -> None:
+    """Put stdin into cbreak mode so single keys are readable without Enter. No-op on Windows."""
+    global _posix_saved_settings
+    if _PLATFORM != "posix" or not HAVE_KEYBOARD:
+        return
+    _posix_saved_settings = termios.tcgetattr(sys.stdin.fileno())
+    tty.setcbreak(sys.stdin.fileno())
+
+
+def restore_terminal() -> None:
+    """Restore stdin's settings saved by enable_raw_mode(). No-op on Windows or if never enabled."""
+    if _PLATFORM != "posix" or _posix_saved_settings is None:
+        return
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _posix_saved_settings)
 
 # --------------------------------------------------------------------------
 # Stand configuration
@@ -122,13 +145,26 @@ def send_zero_all(bus: can.BusABC) -> None:
 
 def poll_key() -> str | None:
     """Non-blocking single-key read. Returns None if nothing is waiting."""
-    if not HAVE_KEYBOARD or not msvcrt.kbhit():
+    if not HAVE_KEYBOARD:
         return None
-    ch = msvcrt.getch()
-    if ch in (b"\x00", b"\xe0"):   # arrow / function keys send a second byte
-        msvcrt.getch()
+    if _PLATFORM == "windows":
+        if not msvcrt.kbhit():
+            return None
+        ch = msvcrt.getch()
+        if ch in (b"\x00", b"\xe0"):   # arrow / function keys send a second byte
+            msvcrt.getch()
+            return None
+        return ch.decode("utf-8", "ignore").lower()
+
+    if not select.select([sys.stdin], [], [], 0)[0]:
         return None
-    return ch.decode("utf-8", "ignore").lower()
+    ch = sys.stdin.read(1)
+    if ch == "\x1b":   # ESC prefixes an ANSI arrow-key escape sequence; drain and ignore it
+        if select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == "[":
+            if select.select([sys.stdin], [], [], 0)[0]:
+                sys.stdin.read(1)
+        return None
+    return ch.lower()
 
 
 # --------------------------------------------------------------------------
@@ -438,7 +474,7 @@ def run_live(bus: can.BusABC, listen_only: bool) -> None:
     last_draw = 0.0
 
     if not HAVE_KEYBOARD:
-        print("Keyboard input unavailable on this platform - "
+        print("stdin is not an interactive terminal - "
               "spacebar stop is disabled.")
 
     def render():
@@ -530,6 +566,7 @@ def main() -> None:
           f"at {args.bitrate} bps ...")
 
     bus = None
+    enable_raw_mode()
     try:
         bus = open_bus(args)
         run_raw(bus) if args.raw else run_live(bus, args.listen_only)
@@ -541,6 +578,7 @@ def main() -> None:
               "bound via Zadig; libusb-1.0.dll present; nothing else holding "
               "the device; CANH, CANL and GND all connected.")
     finally:
+        restore_terminal()
         if bus is not None:
             # Always leave the stand with zero torque commanded, whatever
             # path we took out of the loop.

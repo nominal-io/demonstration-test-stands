@@ -46,6 +46,7 @@ import argparse
 import csv
 import math
 import struct
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -60,9 +61,31 @@ from rich.text import Text
 
 try:
     import msvcrt  # Windows only
-    HAVE_KEYBOARD = True
+    _PLATFORM = "windows"
 except ImportError:
-    HAVE_KEYBOARD = False
+    import select
+    import termios
+    import tty
+    _PLATFORM = "posix"
+
+HAVE_KEYBOARD = sys.stdin.isatty()
+_posix_saved_settings = None
+
+
+def enable_raw_mode() -> None:
+    """Put stdin into cbreak mode so single keys are readable without Enter. No-op on Windows."""
+    global _posix_saved_settings
+    if _PLATFORM != "posix" or not HAVE_KEYBOARD:
+        return
+    _posix_saved_settings = termios.tcgetattr(sys.stdin.fileno())
+    tty.setcbreak(sys.stdin.fileno())
+
+
+def restore_terminal() -> None:
+    """Restore stdin's settings saved by enable_raw_mode(). No-op on Windows or if never enabled."""
+    if _PLATFORM != "posix" or _posix_saved_settings is None:
+        return
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _posix_saved_settings)
 
 # --------------------------------------------------------------------------
 # Stand constants
@@ -405,13 +428,28 @@ def send_zero_all(bus: can.BusABC, h: BusHealth) -> None:
 
 
 def poll_key() -> str | None:
-    if not HAVE_KEYBOARD or not msvcrt.kbhit():
+    if not HAVE_KEYBOARD:
         return None
-    ch = msvcrt.getch()
-    if ch in (b"\x00", b"\xe0"):
-        return {b"H": "UP", b"P": "DOWN",
-                b"K": "LEFT", b"M": "RIGHT"}.get(msvcrt.getch())
-    return ch.decode("utf-8", "ignore").lower()
+    if _PLATFORM == "windows":
+        if not msvcrt.kbhit():
+            return None
+        ch = msvcrt.getch()
+        if ch in (b"\x00", b"\xe0"):
+            return {b"H": "UP", b"P": "DOWN",
+                    b"K": "LEFT", b"M": "RIGHT"}.get(msvcrt.getch())
+        return ch.decode("utf-8", "ignore").lower()
+
+    if not select.select([sys.stdin], [], [], 0)[0]:
+        return None
+    ch = sys.stdin.read(1)
+    if ch != "\x1b":  # ESC prefixes an ANSI arrow-key escape sequence
+        return ch.lower()
+    if not select.select([sys.stdin], [], [], 0)[0]:
+        return None
+    ch2 = sys.stdin.read(1)
+    if ch2 != "[" or not select.select([sys.stdin], [], [], 0)[0]:
+        return None
+    return {"A": "UP", "B": "DOWN", "C": "RIGHT", "D": "LEFT"}.get(sys.stdin.read(1))
 
 
 # --------------------------------------------------------------------------
@@ -919,7 +957,7 @@ def run(bus: can.BusABC, seq: Sequence, dry_run: bool, log_path: Path,
     last_tx = last_draw = last_log = 0.0
 
     if not HAVE_KEYBOARD:
-        print("Keyboard unavailable on this platform - cannot arm or abort.")
+        print("stdin is not an interactive terminal - cannot arm or abort.")
         return
 
     # Receive on its own thread. Nothing in the main loop can starve it.
@@ -1071,6 +1109,7 @@ def main() -> None:
 
     bus = None
     health_fallback = BusHealth()
+    enable_raw_mode()
     try:
         bus = open_bus(args)
         run(bus, seq, args.dry_run, log_path, args.tx_hz)
@@ -1079,6 +1118,7 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001
         print(f"\n{e}")
     finally:
+        restore_terminal()
         if bus is not None:
             if not args.dry_run:
                 for _ in range(5):
