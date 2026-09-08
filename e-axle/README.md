@@ -1,8 +1,7 @@
 # E-Axle Dynamometer Test Stand
 
 Manual-control software for a small-scale E-Axle drivetrain dynamometer,
-built on [Nominal Connect](https://github.com/nominal-io/connect) and
-[Instro](https://github.com/nominal-io/instro).
+built on Nominal Connect and [Instro](https://github.com/nominal-io/instro).
 
 ## What is this
 
