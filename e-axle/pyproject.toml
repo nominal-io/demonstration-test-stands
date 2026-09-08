@@ -1,0 +1,18 @@
+[project]
+name = "e-axle"
+version = "0.1.0"
+description = "Manual-control software for the E-Axle drivetrain dynamometer test stand"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "instro>=1.16.0",
+    "instro-unstable>=1.10.0",
+    "python-can>=4.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.uv]
+package = false

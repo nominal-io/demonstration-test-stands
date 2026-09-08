@@ -37,10 +37,6 @@ copy of that arithmetic as this test tree's main drift risk. See design.md's Ope
 Artifact Decisions for the alternatives, and the recommended follow-up to extract
 tests/_can_plant.py at cleanup.
 
-Consequently this test carries the same prerequisite as the one it borrows from:
-it cannot be COLLECTED without instro.unstable.motorcontroller, which today
-exists only on the branch install recorded in TASKS.md T-7.
-
 THE PLANT IS DISOBEDIENT HERE, FOR THE FIRST TIME IN THIS PROJECT. _FaultPlant
 below overrides the MDC's reported velocity so the test can drive the machine
 into an overspeed the app never commanded -- exactly what design-gate Finding 9

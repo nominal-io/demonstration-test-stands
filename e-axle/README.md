@@ -95,39 +95,24 @@ for: this is the loop a future operator UI would drive at a fixed rate
 ## Installation
 
 Requires Python 3.11+ (developed and tested on 3.14) and
-[`uv`](https://github.com/astral-sh/uv).
+[`uv`](https://github.com/astral-sh/uv). Dependencies (`instro`,
+`instro-unstable>=1.10.0` for the VESC6 motor-controller driver, `python-can`,
+`pytest`) are declared in `pyproject.toml` and resolved from PyPI — no
+worktree or branch install needed:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install pytest python-can instro instro-unstable
+uv sync
 ```
 
 The core (`interlocks.py`, `units.py`, `session.py`, `stand.py`) needs
-nothing beyond that: they're deliberately free of any `instro` import at
-module load time. **Running the test suite in full**, however, needs
-Instro's VESC6 motor-controller driver. It merged into `instro`'s `main`
-branch on 2026-09-03 (`instro#386`), but no `instro-unstable` release has
-shipped with it yet, so until one does, install from a worktree pinned to
-that commit instead:
-
-```bash
-git clone <instro-repo-url> ../instro
-git -C ../instro fetch origin main
-git -C ../instro worktree add ../instro-worktree e7f9627
-
-uv pip install --python .venv/bin/python \
-  -e ../instro-worktree \
-  -e ../instro-worktree/packages/instro-unstable
-```
-
-Once a release of `instro-unstable` ships with the VESC6 driver, this step
-goes away and installing `instro-unstable` normally (as in the command
-above) is enough on its own.
+nothing beyond the standard library: they're deliberately free of any
+`instro` import at module load time. Only the test suite needs the
+`instro`/`instro-unstable` packages that `uv sync` installs.
 
 ## First run
 
 ```bash
-.venv/bin/pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 All 115 tests should pass. This includes one full feature test

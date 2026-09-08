@@ -30,20 +30,6 @@ shape are instro's own, from tests/unstable/motorcontroller/test_vesc_6.py and
 tests/psu/simulated/test_simulated_psu_software.py -- this repo invents no
 protocol and no fake of its own.
 
-WHAT THAT COSTS. This test cannot be COLLECTED without the real instro package
-importable, including instro.unstable.motorcontroller, which today exists only
-on origin/issue-362-vesc6-motor-controller-driver and is NOT in the released
-instro-unstable 1.7.0. Local dev install only -- never committed to app.connect:
-
-    git -C <instro-checkout> checkout issue-362-vesc6-motor-controller-driver
-    uv pip install -e <instro-checkout> \
-                   -e <instro-checkout>/packages/instro-unstable
-
-Do NOT install via `pip install git+...#subdirectory=packages/instro-unstable`:
-plain pip ignores instro's uv workspace source, resolves core `instro` from
-PyPI, and pairs branch-era instro-unstable code with a newer instro that nobody
-tests together. See design.md, "The Feature Test".
-
 THE NUMBERS BELOW CAME FROM THE MACHINE, NOT FROM THE DRIVER. Every scaling
 constant in _Plant is transcribed from design.md's CAN contract table, which was
 derived from Tyler Rowan's commissioning scripts independently of instro. They
