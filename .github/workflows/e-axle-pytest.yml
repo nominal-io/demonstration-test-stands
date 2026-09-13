@@ -2,6 +2,8 @@ name: Run E-Axle Unit Tests
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'e-axle/**'
   pull_request:
