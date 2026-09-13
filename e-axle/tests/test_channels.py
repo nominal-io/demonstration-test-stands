@@ -3,27 +3,32 @@ import pytest
 from channels import Controllable, Monitorable, NumericControlChannel
 
 
-def test_control_point_default_construction():
+def test_controllable_default_construction():
     point = Controllable(default=1.0)
     assert point.setpoint == 1.0
     assert point.default == 1.0
     assert point.measured is None
 
 
-def test_control_point_setpoint_roundtrip():
+def test_controllable_is_not_monitorable():
+    point = Controllable(default=False)
+    assert not isinstance(point, Monitorable)
+
+
+def test_controllable_setpoint_roundtrip():
     point = Controllable(default=1.0)
     point.setpoint = 2.0
     assert point.setpoint == 2.0
     assert point.requested == 2.0
 
 
-def test_control_point_measured_roundtrip():
+def test_controllable_measured_roundtrip():
     point = Controllable(default=1.0)
     point.measured = 3.0
     assert point.measured == 3.0
 
 
-def test_control_point_default_is_read_only():
+def test_controllable_default_is_read_only():
     point = Controllable(default=1.0)
     with pytest.raises(AttributeError):
         point.default = 5.0
@@ -87,11 +92,6 @@ def test_numeric_control_channel_repr_omits_requested_when_not_clamped():
     assert repr(channel) == "NumericControlChannel(setpoint=7.0, measured=None)"
 
 
-def test_control_point_is_not_monitorable():
-    point = Controllable(default=False)
-    assert not isinstance(point, Monitorable)
-
-
 def test_numeric_control_channel_is_both_controllable_and_monitorable():
     channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
     assert isinstance(channel, Controllable)
@@ -120,6 +120,10 @@ def test_monitorable_default_construction():
     assert point.measured is None
     assert point.minimum == 0.0
     assert point.maximum == 90.0
+
+
+def test_monitorable_not_controllable():
+    point = Monitorable(minimum=0.0, maximum=90.0)
     assert not isinstance(point, Controllable)
 
 
@@ -138,6 +142,18 @@ def test_monitorable_tripped_when_measured_out_of_bounds():
     point = Monitorable(minimum=0.0, maximum=90.0)
     point.measured = 95.0
     assert point.tripped
+
+
+def test_monitorable_not_tripped_when_at_minimum():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    point.measured = 0.0
+    assert not point.tripped
+
+
+def test_monitorable_not_tripped_when_at_maximum():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    point.measured = 90.0
+    assert not point.tripped
 
 
 def test_monitorable_repr():
