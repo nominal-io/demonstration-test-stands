@@ -15,7 +15,7 @@ class ControlPoint(Generic[T]):
 
     def __repr__(self) -> str:
         if self._requested != self._setpoint:
-            return f"{self.__class__.__name__}(requested={self._requested}, setpoint={self.setpoint}, measured={self.measured})"
+            return f"{self.__class__.__name__}(requested={self.requested}, setpoint={self.setpoint}, measured={self.measured})"
         return f"{self.__class__.__name__}(setpoint={self.setpoint}, measured={self.measured})"
 
     def _validate(self, value: T) -> T:
