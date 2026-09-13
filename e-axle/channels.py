@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from math import inf
 from time import monotonic
-from typing import ClassVar, Generic, Protocol, TypeVar
+from typing import Callable, ClassVar, Generic, Protocol, TypeVar
 
 
 T = TypeVar("T")
@@ -109,9 +109,23 @@ class Monitorable(Measurable[TOrdered]):
             raise ValueError(f"minimum {minimum} is greater than maximum {maximum}")
         self._minimum = minimum
         self._maximum = maximum
+        self.on_trip: Callable[["Monitorable[TOrdered]"], None] | None = None
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.to_isoformat()}: minimum={self.minimum}, measured={self.measured}, maximum={self.maximum})"
+
+    @property
+    def measured(self) -> TOrdered | None:
+        """Get the measured value."""
+        return self._measured
+
+    @measured.setter
+    def measured(self, value: TOrdered | None) -> None:
+        """Record a new measured value, then notify on_trip if it's now out of range."""
+        self._measured = value
+        self._timestamp = monotonic()
+        if self.tripped and self.on_trip is not None:
+            self.on_trip(self)
 
     @property
     def minimum(self) -> TOrdered:

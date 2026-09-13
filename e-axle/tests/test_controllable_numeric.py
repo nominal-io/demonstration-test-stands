@@ -84,6 +84,14 @@ def test_controllable_numeric_tripped_when_measured_out_of_bounds():
     assert channel.tripped
 
 
+def test_controllable_numeric_on_trip_called_when_out_of_bounds():
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
+    calls = []
+    channel.on_trip = calls.append
+    channel.measured = 15.0
+    assert calls == [channel]
+
+
 def test_controllable_numeric_raises_when_deadband_negative():
     with pytest.raises(ValueError):
         ControllableNumeric(default=5.0, deadband=-0.1)

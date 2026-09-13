@@ -46,6 +46,36 @@ def test_monitorable_not_tripped_when_at_maximum():
     assert not point.tripped
 
 
+def test_monitorable_on_trip_not_called_when_within_bounds():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    calls = []
+    point.on_trip = calls.append
+    point.measured = 50.0
+    assert calls == []
+
+
+def test_monitorable_on_trip_called_when_out_of_bounds():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    calls = []
+    point.on_trip = calls.append
+    point.measured = 95.0
+    assert calls == [point]
+
+
+def test_monitorable_on_trip_called_every_time_while_still_tripped():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    calls = []
+    point.on_trip = calls.append
+    point.measured = 95.0
+    point.measured = 100.0
+    assert calls == [point, point]
+
+
+def test_monitorable_on_trip_default_is_none_and_does_not_raise():
+    point = Monitorable(minimum=0.0, maximum=90.0)
+    point.measured = 95.0  # no on_trip registered -- must not raise
+
+
 def test_monitorable_repr(monkeypatch):
     monkeypatch.setattr("channels.monotonic", lambda: 12345.0)
     point = Monitorable(minimum=0.0, maximum=90.0)
