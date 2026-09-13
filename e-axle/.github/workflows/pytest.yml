@@ -1,0 +1,31 @@
+name: Run Pytest
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    # Define the matrix of Python versions to test against
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Dynamically inject the version from the matrix above
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Run tests with pytest
+      run: |
+        pytest
