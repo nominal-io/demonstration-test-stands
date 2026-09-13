@@ -3,7 +3,7 @@ name: Run Pytest
 on: [push, pull_request]
 
 jobs:
-  test:
+  python-unit-test:
     runs-on: ubuntu-latest
     
     # Define the matrix of Python versions to test against
@@ -13,11 +13,11 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
     # Dynamically inject the version from the matrix above
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9cv5
       with:
         python-version: ${{ matrix.python-version }}
 
