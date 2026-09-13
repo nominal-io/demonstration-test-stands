@@ -1,6 +1,6 @@
 import pytest
 
-from channels import Controllable, Monitorable, NumericControlChannel
+from channels import Controllable, Monitorable, ControllableNumeric
 
 
 def test_controllable_default_construction():
@@ -35,7 +35,7 @@ def test_controllable_default_is_read_only():
 
 
 def test_numeric_control_channel_default_construction():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     assert channel.setpoint == 5.0
     assert channel.default == 5.0
     assert channel.measured is None
@@ -45,25 +45,25 @@ def test_numeric_control_channel_default_construction():
 
 def test_numeric_control_channel_raises_when_default_out_of_bounds():
     with pytest.raises(ValueError):
-        NumericControlChannel(default=500.0, minimum=0.0, maximum=100.0)
+        ControllableNumeric(default=500.0, minimum=0.0, maximum=100.0)
 
 
 def test_numeric_control_channel_clamps_below_minimum():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = -5.0
     assert channel.setpoint == 0.0
     assert channel.requested == -5.0
 
 
 def test_numeric_control_channel_clamps_above_maximum():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = 50.0
     assert channel.setpoint == 10.0
     assert channel.requested == 50.0
 
 
 def test_numeric_control_channel_passes_through_in_range():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = 7.0
     assert channel.setpoint == 7.0
     assert channel.requested == 7.0
@@ -71,46 +71,46 @@ def test_numeric_control_channel_passes_through_in_range():
 
 def test_numeric_control_channel_raises_when_minimum_greater_than_maximum():
     with pytest.raises(ValueError):
-        NumericControlChannel(default=5.0, minimum=100.0, maximum=0.0)
+        ControllableNumeric(default=5.0, minimum=100.0, maximum=0.0)
 
 
 def test_numeric_control_channel_unbounded_by_default():
-    channel = NumericControlChannel(default=5.0)
+    channel = ControllableNumeric(default=5.0)
     channel.setpoint = 1e300
     assert channel.setpoint == 1e300
 
 
 def test_numeric_control_channel_repr_shows_requested_when_clamped():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = 50.0
-    assert repr(channel) == "NumericControlChannel(requested=50.0, setpoint=10.0, measured=None)"
+    assert repr(channel) == "ControllableNumeric(requested=50.0, setpoint=10.0, measured=None)"
 
 
 def test_numeric_control_channel_repr_omits_requested_when_not_clamped():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = 7.0
-    assert repr(channel) == "NumericControlChannel(setpoint=7.0, measured=None)"
+    assert repr(channel) == "ControllableNumeric(setpoint=7.0, measured=None)"
 
 
 def test_numeric_control_channel_is_both_controllable_and_monitorable():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     assert isinstance(channel, Controllable)
     assert isinstance(channel, Monitorable)
 
 
 def test_numeric_control_channel_not_tripped_within_bounds():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.measured = 5.0
     assert not channel.tripped
 
 
 def test_numeric_control_channel_not_tripped_when_unmeasured():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     assert not channel.tripped
 
 
 def test_numeric_control_channel_tripped_when_measured_out_of_bounds():
-    channel = NumericControlChannel(default=5.0, minimum=0.0, maximum=10.0)
+    channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.measured = 15.0
     assert channel.tripped
 

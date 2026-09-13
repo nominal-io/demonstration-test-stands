@@ -99,7 +99,7 @@ class Monitorable(Measurable[TOrdered]):
         return self.measured is not None and (self.measured < self._minimum or self.measured > self._maximum)
 
 
-class NumericControlChannel(Controllable[float], Monitorable[float]):
+class ControllableNumeric(Controllable[float], Monitorable[float]):
     """A numeric channel that is both commandable, clamped to a range, and monitored for trips."""
 
     def __init__(self, default: float, minimum: float = -inf, maximum: float = inf) -> None:
