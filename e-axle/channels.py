@@ -1,4 +1,5 @@
 from math import inf
+from time import monotonic
 from typing import Generic, Protocol, TypeVar
 
 
@@ -18,7 +19,8 @@ class Measurable(Generic[T]):
 
     def __init__(self) -> None:
         super().__init__()
-        self._measured: T | None = None
+        self._measured = None
+        self._timestamp = None
 
     @property
     def measured(self) -> T | None:
@@ -29,6 +31,12 @@ class Measurable(Generic[T]):
     def measured(self, value: T | None) -> None:
         """Record a new measured value."""
         self._measured = value
+        self._timestamp = monotonic()
+
+    @property
+    def timestamp(self) -> float | None:
+        """Get the timestamp of the last measurement attempt, or None if none has occurred."""
+        return self._timestamp
 
 
 class Controllable(Measurable[T]):

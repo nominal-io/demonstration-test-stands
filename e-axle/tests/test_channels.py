@@ -1,6 +1,42 @@
+import time
+
 import pytest
 
-from channels import Controllable, Monitorable, ControllableNumeric
+from channels import Controllable, Measureable, Monitorable, ControllableNumeric
+
+def test_measurable_default_construction():
+    point = Measureable()
+    assert point.measured is None
+    assert point.timestamp is None
+
+
+def test_measureable_timestamp_is_not_settable():
+    point = Measureable()
+    with pytest.raises(AttributeError):
+        point.timestamp = 5.0
+
+
+def test_measureable_timestamp_set_after_measurement():
+    point = Measureable()
+    point.measured = 3.0
+    assert point.timestamp is not None
+
+
+def test_measureable_timestamp_set_even_when_measurement_produces_none():
+    point = Measureable()
+    point.measured = None
+    assert point.timestamp is not None
+
+
+def test_measureable_timestamp_updates_on_each_measurement():
+    point = Measureable()
+    point.measured = 3.0
+    first = point.timestamp
+    time.sleep(0.001)
+    point.measured = 4.0
+    second = point.timestamp
+    assert second is not None and first is not None
+    assert second > first
 
 
 def test_controllable_default_construction():
