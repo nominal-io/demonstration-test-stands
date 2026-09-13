@@ -1,6 +1,7 @@
+from datetime import datetime, timedelta
 from math import inf
 from time import monotonic
-from typing import Generic, Protocol, TypeVar
+from typing import ClassVar, Generic, Protocol, TypeVar
 
 
 T = TypeVar("T")
@@ -17,10 +18,16 @@ TOrdered = TypeVar("TOrdered", bound=Comparable)
 class Measurable(Generic[T]):
     """A quantity whose actual measured value is tracked."""
 
+    _monotonic_origin: ClassVar[float]
+    _wall_origin: ClassVar[datetime]
+
     def __init__(self) -> None:
         super().__init__()
         self._measured = None
         self._timestamp = None
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.to_isoformat()}: measured={self.measured})"
 
     @property
     def measured(self) -> T | None:
@@ -35,8 +42,18 @@ class Measurable(Generic[T]):
 
     @property
     def timestamp(self) -> float | None:
-        """Get the timestamp of the last measurement attempt, or None if none has occurred."""
+        """Get the time.monotonic() reading of the last measurement attempt, or None if none has occurred."""
         return self._timestamp
+
+    def to_isoformat(self) -> str | None:
+        """Convert this channel's timestamp into an ISO 8601 wall-clock string, for display (e.g. logs)."""
+        if self._timestamp is None:
+            return None
+        return (self._wall_origin + timedelta(seconds=self._timestamp - self._monotonic_origin)).isoformat(timespec="seconds")
+
+
+Measurable._monotonic_origin = monotonic()
+Measurable._wall_origin = datetime.now()
 
 
 class Controllable(Measurable[T]):
@@ -49,8 +66,8 @@ class Controllable(Measurable[T]):
 
     def __repr__(self) -> str:
         if self.requested != self.setpoint:
-            return f"{self.__class__.__name__}(requested={self.requested}, setpoint={self.setpoint}, measured={self.measured})"
-        return f"{self.__class__.__name__}(setpoint={self.setpoint}, measured={self.measured})"
+            return f"{self.__class__.__name__}({self.to_isoformat()}: requested={self.requested}, setpoint={self.setpoint}, measured={self.measured})"
+        return f"{self.__class__.__name__}({self.to_isoformat()}: setpoint={self.setpoint}, measured={self.measured})"
 
     def _validate(self, value: T) -> T:
         """Hook for subclasses to transform or validate an incoming setpoint. No-op by default."""
@@ -89,7 +106,7 @@ class Monitorable(Measurable[TOrdered]):
         self._maximum = maximum
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(minimum={self.minimum}, measured={self.measured}, maximum={self.maximum})"
+        return f"{self.__class__.__name__}({self.to_isoformat()}: minimum={self.minimum}, measured={self.measured}, maximum={self.maximum})"
 
     @property
     def minimum(self) -> TOrdered:

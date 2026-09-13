@@ -1,4 +1,5 @@
 import time
+from datetime import timedelta
 
 import pytest
 
@@ -38,3 +39,23 @@ def test_measurable_timestamp_updates_on_each_measurement():
     second = point.timestamp
     assert second is not None and first is not None
     assert second > first
+
+
+def test_measurable_timestamp_is_the_raw_monotonic_reading(monkeypatch):
+    monkeypatch.setattr("channels.monotonic", lambda: 12345.0)
+    point = Measurable()
+    point.measured = 3.0
+    assert point.timestamp == 12345.0
+
+
+def test_measurable_to_isoformat_is_none_before_measurement():
+    point = Measurable()
+    assert point.to_isoformat() is None
+
+
+def test_measurable_to_isoformat_matches_origin_conversion():
+    point = Measurable()
+    point.measured = 3.0
+    assert point.timestamp is not None
+    expected = Measurable._wall_origin + timedelta(seconds=point.timestamp - Measurable._monotonic_origin)
+    assert point.to_isoformat() == expected.isoformat(timespec="seconds")
