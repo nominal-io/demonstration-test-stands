@@ -94,6 +94,11 @@ class Controllable(Measurable[T]):
         """Get the control point's default value."""
         return self._default
 
+    @property
+    def at_setpoint(self) -> bool:
+        """Whether the measured value currently matches the commanded setpoint."""
+        return self.measured == self.setpoint
+
 
 class Monitorable(Measurable[TOrdered]):
     """A measured-only quantity watched against a safe minimum and maximum."""
@@ -127,12 +132,15 @@ class Monitorable(Measurable[TOrdered]):
 class ControllableNumeric(Controllable[float], Monitorable[float]):
     """A numeric channel that is both commandable, clamped to a range, and monitored for trips."""
 
-    def __init__(self, default: float, minimum: float = -inf, maximum: float = inf) -> None:
+    def __init__(self, default: float, minimum: float = -inf, maximum: float = inf, deadband: float = 0.0) -> None:
         if minimum > maximum:
             raise ValueError(f"minimum {minimum} is greater than maximum {maximum}")
         if default < minimum or default > maximum:
             raise ValueError(f"Default value {default} is outside of bounds [{minimum}, {maximum}]")
+        if deadband < 0:
+            raise ValueError(f"deadband {deadband} is negative")
         super().__init__(default=default, minimum=minimum, maximum=maximum)
+        self._deadband = deadband
 
     def _validate(self, value: float) -> float:
         """Clamp the incoming setpoint to the channel's range."""
@@ -141,3 +149,13 @@ class ControllableNumeric(Controllable[float], Monitorable[float]):
         if value > self._maximum:
             return self._maximum
         return value
+
+    @property
+    def deadband(self) -> float:
+        """Get how far the measured value may sit from the setpoint and still count as at-setpoint."""
+        return self._deadband
+
+    @property
+    def at_setpoint(self) -> bool:
+        """Whether the measured value is within the deadband of the commanded setpoint."""
+        return self.measured is not None and abs(self.measured - self.setpoint) <= self._deadband
