@@ -3,21 +3,21 @@ name: Run Pytest
 on: [push, pull_request]
 
 jobs:
-  python-unit-test:
+  test:
+    name: Run Pytest on Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    
-    # Define the matrix of Python versions to test against
+
     strategy:
       matrix:
         python-version: ['3.12', '3.13', '3.14']
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-    # Dynamically inject the version from the matrix above
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9cv5
+      # This version of setup-python is pinned to an immutable release
+      uses: actions/setup-python@v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
 
