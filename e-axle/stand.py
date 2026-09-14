@@ -255,8 +255,30 @@ class EAxleStand:
     def __init__(
         self,
         config: EAxleStandConfig,
+        dut_controller: InstroMotorController,
+        left_load_controller: InstroMotorController,
+        right_load_controller: InstroMotorController,
+        source_driver: InstroPSU,
+        sink_driver: InstroELoad,
     ) -> None:
-        ...
+        """Build every instrument from already-constructed instro instances plus config, wire the trip and command interlocks, and start OFF."""
+        self.config = config
+        self._disarm_timeout_s = config.disarm_timeout_s
+        self._arm_timeout_s = config.arm_timeout_s
+        self._stop_timeout_s = config.stop_timeout_s
+        self._trip_stop_timeout_s = config.trip_stop_timeout_s
+        self._boot_timeout_s = config.boot_timeout_s
+        self._trip_lock = threading.Lock()
+
+        self.dut = Motor(name="dut", controller=dut_controller, config=config.dut_controller)
+        self.left_load = Motor(name="left_load", controller=left_load_controller, config=config.left_load_controller)
+        self.right_load = Motor(name="right_load", controller=right_load_controller, config=config.right_load_controller)
+        self.source = Source(name="source", driver=source_driver, config=config.source)
+        self.sink = Sink(name="sink", driver=sink_driver, config=config.sink)
+
+        self.state = EAxleStandState.OFF
+        self._wire_trip_delegates()
+        self._wire_command_interlock()
 
     def open(self) -> None:
         """Connect every instrument and bring the bus to its default voltage."""

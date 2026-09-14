@@ -13,6 +13,8 @@ from stand_config import (
     ControllableConfig,
     ControllableNumericConfig,
     DutControllerConfig,
+    EAxleStandConfig,
+    LoadControllerConfig,
     MonitorableConfig,
     SinkConfig,
     SourceConfig,
@@ -88,10 +90,6 @@ class _FakeController:
 
 def _dut_config() -> DutControllerConfig:
     return DutControllerConfig(
-        can_channel="0",
-        can_node_id=0,
-        pole_pairs=4,
-        driver="instro.unstable.motorcontroller.drivers.vesc_6.VESC6",
         torque=ControllableNumericConfig(default=0.0, minimum=-27.5, maximum=27.5),
         speed=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=0.0, minimum=-35.0, maximum=35.0),
@@ -305,8 +303,6 @@ class _FakePSUDriver:
 def _source_config() -> SourceConfig:
     return SourceConfig(
         psu_channel_number=1,
-        network_address="TCPIP0::192.168.1.50::5025::SOCKET",
-        driver="instro.psu.drivers.ea_psb10000.EAPSB10000VisaSource",
         voltage=ControllableNumericConfig(default=48.0, minimum=0.0, maximum=54.0),
         current=ControllableNumericConfig(default=0.0, minimum=0.0, maximum=20.0),
         enabled=ControllableConfig(default=False),
@@ -465,8 +461,6 @@ class _FakeELoadDriver:
 def _sink_config() -> SinkConfig:
     return SinkConfig(
         psu_channel_number=1,
-        network_address="TCPIP0::192.168.1.50::5025::SOCKET",
-        driver="instro.psu.drivers.ea_psb10000.EAPSB10000VisaSink",
         voltage=ControllableNumericConfig(default=48.0, minimum=0.0, maximum=54.0),
         current=ControllableNumericConfig(default=0.0, minimum=0.0, maximum=40.0),
         enabled=ControllableConfig(default=False),
@@ -839,10 +833,6 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
-        can_channel="0",
-        can_node_id=0,
-        pole_pairs=4,
-        driver="instro.unstable.motorcontroller.drivers.vesc_6.VESC6",
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
         speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
@@ -882,10 +872,6 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 0.05
     nonzero_default_config = DutControllerConfig(
-        can_channel="0",
-        can_node_id=0,
-        pole_pairs=4,
-        driver="instro.unstable.motorcontroller.drivers.vesc_6.VESC6",
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
         speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
@@ -1029,3 +1015,81 @@ def test_close_from_already_tripped_does_not_re_trip_but_still_disconnects():
     assert dut_ctrl.closed is True
     assert psu.closed is True
     assert eload.closed is True
+
+
+def _load_config() -> LoadControllerConfig:
+    return LoadControllerConfig(
+        torque=ControllableNumericConfig(default=0.0, minimum=-3.8, maximum=3.8),
+        speed=ControllableNumericConfig(default=0.0, minimum=-471.0, maximum=471.0),
+        current=ControllableNumericConfig(default=0.0, minimum=-20.0, maximum=20.0),
+        temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
+    )
+
+
+def _stand_config() -> EAxleStandConfig:
+    return EAxleStandConfig(
+        dut_controller=_dut_config(),
+        left_load_controller=_load_config(),
+        right_load_controller=_load_config(),
+        source=_source_config(),
+        sink=_sink_config(),
+        disarm_timeout_s=2.0,
+        arm_timeout_s=5.0,
+        stop_timeout_s=10.0,
+        trip_stop_timeout_s=1.0,
+        boot_timeout_s=5.0,
+    )
+
+
+def _init_stand() -> EAxleStand:
+    return EAxleStand(
+        _stand_config(),
+        cast(InstroMotorController, _FakeController("dut")),
+        cast(InstroMotorController, _FakeController("left_load")),
+        cast(InstroMotorController, _FakeController("right_load")),
+        cast(InstroPSU, _FakePSUDriver("source")),
+        cast(InstroELoad, _FakeELoadDriver("sink")),
+    )
+
+
+def test_init_builds_every_instrument_and_starts_off():
+    stand = _init_stand()
+    assert stand.state == EAxleStandState.OFF
+    assert stand.dut.controller.name == "dut"
+    assert stand.left_load.controller.name == "left_load"
+    assert stand.right_load.controller.name == "right_load"
+    assert stand.source.driver.name == "source"
+    assert stand.sink.driver.name == "sink"
+
+
+def test_init_sets_every_timeout_from_config():
+    stand = _init_stand()
+    assert stand._disarm_timeout_s == 2.0
+    assert stand._arm_timeout_s == 5.0
+    assert stand._stop_timeout_s == 10.0
+    assert stand._trip_stop_timeout_s == 1.0
+    assert stand._boot_timeout_s == 5.0
+    assert isinstance(stand._trip_lock, type(threading.Lock()))
+
+
+def test_init_wires_trip_delegates_on_monitorable_channels():
+    stand = _init_stand()
+    assert stand.dut.temperature.on_trip == stand._on_trip
+    assert stand.source.voltage.on_trip == stand._on_trip
+    assert stand.sink.voltage.on_trip == stand._on_trip
+
+
+def test_init_does_not_wire_trip_delegate_on_ovp_ocp():
+    stand = _init_stand()
+    assert not isinstance(stand.source.ovp_limit, Monitorable)
+    assert not isinstance(stand.source.ocp_limit, Monitorable)
+
+
+def test_init_wires_command_interlock_on_every_motor():
+    stand = _init_stand()
+    for motor in (stand.dut, stand.left_load, stand.right_load):
+        assert motor.command_enabled is not None
+        assert motor.command_enabled() is False
+        stand.state = EAxleStandState.RUNNING
+        assert motor.command_enabled() is True
+        stand.state = EAxleStandState.OFF
