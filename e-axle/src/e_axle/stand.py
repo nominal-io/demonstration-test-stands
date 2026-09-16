@@ -282,13 +282,13 @@ class EAxleStand:
     def __init__(
         self,
         config: EAxleStandConfig,
-        dut_controller: InstroMotorController,
-        left_load_controller: InstroMotorController,
-        right_load_controller: InstroMotorController,
-        source_driver: InstroPSU,
-        sink_driver: InstroELoad,
+        dut: Motor,
+        left_load: Motor,
+        right_load: Motor,
+        source: Source,
+        sink: Sink,
     ) -> None:
-        """Build every instrument from already-constructed instro instances plus config, wire the trip and command interlocks, and start OFF."""
+        """Hold already-constructed instruments, wire the trip and command interlocks, and start OFF."""
         self.config = config
         self._disarm_timeout_s = config.disarm_timeout_s
         self._arm_timeout_s = config.arm_timeout_s
@@ -297,15 +297,35 @@ class EAxleStand:
         self._boot_timeout_s = config.boot_timeout_s
         self._trip_lock = threading.Lock()
 
-        self.dut = Motor(name="dut", controller=dut_controller, config=config.dut_controller)
-        self.left_load = Motor(name="left_load", controller=left_load_controller, config=config.left_load_controller)
-        self.right_load = Motor(name="right_load", controller=right_load_controller, config=config.right_load_controller)
-        self.source = Source(name="source", driver=source_driver, config=config.source)
-        self.sink = Sink(name="sink", driver=sink_driver, config=config.sink)
+        self.dut = dut
+        self.left_load = left_load
+        self.right_load = right_load
+        self.source = source
+        self.sink = sink
 
         self.state = EAxleStandState.OFF
         self._wire_trip_delegates()
         self._wire_command_interlock()
+
+    @classmethod
+    def from_drivers(
+        cls,
+        config: EAxleStandConfig,
+        dut_controller: InstroMotorController,
+        left_load_controller: InstroMotorController,
+        right_load_controller: InstroMotorController,
+        source_driver: InstroPSU,
+        sink_driver: InstroELoad,
+    ) -> "EAxleStand":
+        """Build every instrument from already-constructed instro instances plus config."""
+        return cls(
+            config,
+            dut=Motor(name="dut", controller=dut_controller, config=config.dut_controller),
+            left_load=Motor(name="left_load", controller=left_load_controller, config=config.left_load_controller),
+            right_load=Motor(name="right_load", controller=right_load_controller, config=config.right_load_controller),
+            source=Source(name="source", driver=source_driver, config=config.source),
+            sink=Sink(name="sink", driver=sink_driver, config=config.sink),
+        )
 
     def open(self) -> None:
         """Connect every instrument and bring the bus to its default voltage."""

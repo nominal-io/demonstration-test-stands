@@ -42,15 +42,6 @@ class _FakeSource:
             self.enabled.measured = self.enabled.setpoint
 
 
-class _FakeMotor:
-
-    def __init__(self) -> None:
-        self.commanded = False
-
-    def command(self) -> None:
-        self.commanded = True
-
-
 class _FakeController:
 
     def __init__(self, name: str = "dut") -> None:
@@ -656,30 +647,22 @@ def test_disarm_transitions_to_off_and_disconnects():
 
 
 
-def _stand_with_motors() -> tuple[EAxleStand, _FakeMotor, _FakeMotor, _FakeMotor]:
-    stand = _bare_stand()
-    dut, left_load, right_load = _FakeMotor(), _FakeMotor(), _FakeMotor()
-    stand.dut = dut
-    stand.left_load = left_load
-    stand.right_load = right_load
-    return stand, dut, left_load, right_load
-
-
 def test_run_requires_armed_state():
-    stand, *_ = _stand_with_motors()
+    stand, *_ = _full_stand()
     stand.state = EAxleStandState.OFF
     with pytest.raises(ValueError):
         stand.run()
 
 
 def test_run_commands_every_motor_and_transitions_to_running():
-    stand, dut, left_load, right_load = _stand_with_motors()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.ARMED
+    for motor in (stand.dut, stand.left_load, stand.right_load):
+        motor.torque.setpoint = 1.0
     stand.run()
     assert stand.state == EAxleStandState.RUNNING
-    assert dut.commanded is True
-    assert left_load.commanded is True
-    assert right_load.commanded is True
+    for controller, motor in ((dut_ctrl, stand.dut), (left_ctrl, stand.left_load), (right_ctrl, stand.right_load)):
+        assert controller.set_current_calls == [pytest.approx(1.0 / motor._effective_kt)]
 
 
 def test_command_interlock_blocks_transmission_while_armed():
@@ -756,17 +739,19 @@ def test_wait_for_measurement_calls_refresh_each_poll():
 
 
 def _full_stand() -> tuple[EAxleStand, _FakeController, _FakeController, _FakeController, _FakePSUDriver, _FakeELoadDriver]:
-    stand = _bare_stand()
     dut_ctrl = _FakeController("dut")
     left_ctrl = _FakeController("left_load")
     right_ctrl = _FakeController("right_load")
-    stand.dut = _make_motor(dut_ctrl)
-    stand.left_load = _make_motor(left_ctrl)
-    stand.right_load = _make_motor(right_ctrl)
     psu = _FakePSUDriver()
-    stand.source = _make_source(psu)
     eload = _FakeELoadDriver()
-    stand.sink = _make_sink(eload)
+    stand = EAxleStand(
+        _stand_config(),
+        dut=_make_motor(dut_ctrl),
+        left_load=_make_motor(left_ctrl),
+        right_load=_make_motor(right_ctrl),
+        source=_make_source(psu),
+        sink=_make_sink(eload),
+    )
     stand._arm_timeout_s = 1.0
     stand._stop_timeout_s = 1.0
     stand._trip_stop_timeout_s = 1.0
@@ -1054,7 +1039,7 @@ def _stand_config() -> EAxleStandConfig:
 
 
 def _init_stand() -> EAxleStand:
-    return EAxleStand(
+    return EAxleStand.from_drivers(
         _stand_config(),
         cast(InstroMotorController, _FakeController("dut")),
         cast(InstroMotorController, _FakeController("left_load")),
