@@ -1,6 +1,9 @@
 # E-Axle Dynamometer Stand
 
-Control software for a real, CAN-connected bench-scale regenerative dynamometer used for electric axle characterization. This is an interface-first rebuild. The channel primitives, configuration, and the safety-oriented state machine are built and fully tested against real driver APIs before any turnkey automation or UI is layered on top.
+Control software for a real, CAN-connected bench-scale regenerative dynamometer used for electric axle characterization. The `e-axle` library is interface-first in its design. The channel primitives, configuration, and the safety-oriented state machine are built and fully tested against real driver APIs before any turnkey automation or UI is layered on top.
+
+## `e-axle` library
+`e-axle` is the python library containing all interface, control, and system constraint constants to be relied upon by further packages. It primarily provides the `EAxleStand`, `EAxleStandConfig`, `EAxleStandState`, and their required inputs to begin interacting with the specific hardware.
 
 ## Hardware being controlled
 
@@ -21,7 +24,7 @@ See `reference/e-axle-dyno_user_manual_rev_1-0.md` for the full hardware design,
 
 A typical session:
 
-1. Construct `EAxleStand(config)` and use it as a context manager. `with EAxleStand(config) as stand:` calls `open()`, which connects every instrument, powers the bus, and confirms all three motor controllers have booted, landing in `ARMED`.
+1. Construct `EAxleStand.from_drivers(config, ...)` and use it as a context manager. `with EAxleStand(config) as stand:` calls `open()`, which connects every instrument, powers the bus, and confirms all three motor controllers have booted, landing in `ARMED`. The plain constructor, `EAxleStand(config, ...)` takes pre-built `Motor`/`Source`/`Sink` objects and is *not* preferred over the aforementioned `EAxleStand.from_drivers(config, ...)` method. Both are provided for testing purposes.
 2. While `ARMED`, stage the test: set `control_mode` and the relevant `torque`/`speed`/`current` setpoint on `dut`/`left_load`/`right_load`. These writes never reach the hardware yet.
 3. Call `run()` to actually begin commanding. State moves to `RUNNING`, and the staged setpoints start being transmitted continuously.
 4. Adjust setpoints live while `RUNNING` to sweep through the test.
@@ -43,19 +46,23 @@ Per the manual, the external E-stop is the only true safety device on this stand
 - `_trip_stop()` is idempotent. A `threading.Lock` guards only the tiny "check state, claim `TRIP_STOPPING`" section at its top, not the whole method, so a second concurrent trip (e.g. two channels tripping on two different instruments' daemon threads at once) bails out immediately instead of running the shutdown sequence twice. It commands every motor to `0.0` directly (never a configured `default`, which need not be zero) and disables both `source` and `sink` before settling into `TRIPPED`. It never raises, even if the wait for confirmation times out.
 - `close()` never raises either, from any starting state. It's the one teardown path `__exit__` depends on when an exception propagates out of a `with EAxleStand(...) as stand:` block, so it must always finish disconnecting rather than leave hardware in an unmanaged state.
 
-## Status
-
-Implemented and tested: `channels.py`, `stand_config.py`, `units.py`, and every method on `Motor`/`Source`/`Sink`/`EAxleStand` **except** `EAxleStand.__init__`, which is still an intentional stub. Nothing yet builds the five instruments from config, sets the timeout fields or `_trip_lock`, or calls `_wire_trip_delegates()`.
-
-## Running the tests
-
-```
-make test
-```
-
-Runs the full pytest suite, then type-checks `stand.py`, `stand_config.py`, `channels.py`, and `units.py` with pyright.
-
 ## Reference material
 
 - `reference/e-axle-dyno_user_manual_rev_1-0.md`: the hardware design, theory of operation, and operating envelope this code implements against.
 - `reference/tooling software/`: the prior ad hoc scripts (`dyno_test.py`, `comms_check.py`, `dut_step_test.py`) this rebuild is superseding.
+
+## Development
+
+This repo uses `just` and `uv` to handle building, checking, formatting, etc. The primary entrypoint is the top-level `justfile` which can delegate to the `e-axle/justfile` directly.
+
+From `e-axle`, use any of the following (or `just`):
+```sh
+just all        # check, lint, format, test
+just check      # ty
+just lint       # ruff check
+just format     # ruff format
+just test       # pytest
+```
+
+and from the root prepend the commands with `e-axle` like: `just e-axle lint`.
+
