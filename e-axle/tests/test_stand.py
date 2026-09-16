@@ -4,13 +4,9 @@ from typing import Any, cast
 
 import pytest
 
-from channels import Controllable, Monitorable
-from instro.eload import InstroELoad, LoadMode
-from instro.lib import Measurement
-from instro.psu import InstroPSU
-from instro.unstable.motorcontroller import InstroMotorController
-from stand import EAxleStand, EAxleStandState, Motor, Sink, Source
-from stand_config import (
+from e_axle.channels import Controllable, Monitorable
+from e_axle.stand import EAxleStand, EAxleStandState, Motor, Sink, Source
+from e_axle.stand_config import (
     ControllableConfig,
     ControllableNumericConfig,
     DutControllerConfig,
@@ -20,6 +16,10 @@ from stand_config import (
     SinkConfig,
     SourceConfig,
 )
+from instro.eload import InstroELoad, LoadMode
+from instro.lib import Measurement
+from instro.psu import InstroPSU
+from instro.unstable.motorcontroller import InstroMotorController
 
 
 def _bare_stand() -> EAxleStand:

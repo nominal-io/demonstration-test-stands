@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from channels import Controllable, ControllableNumeric, Monitorable
-from stand_config import EAxleStandConfig
+from e_axle.channels import Controllable, ControllableNumeric, Monitorable
+from e_axle.stand_config import EAxleStandConfig
 
 _CONFIG_PATH = Path(__file__).parent.parent / "nominal_config.yaml"
 

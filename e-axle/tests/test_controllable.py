@@ -1,6 +1,6 @@
 import pytest
 
-from channels import Controllable, Monitorable
+from e_axle.channels import Controllable, Monitorable
 
 
 def test_controllable_default_construction():
