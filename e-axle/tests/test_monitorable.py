@@ -80,7 +80,10 @@ def test_monitorable_repr(monkeypatch):
     monkeypatch.setattr("e_axle.channels.monotonic", lambda: 12345.0)
     point = Monitorable(minimum=0.0, maximum=90.0)
     point.measured = 50.0
-    when = (Measurable._wall_origin + timedelta(seconds=12345.0 - Measurable._monotonic_origin)).isoformat(
-        timespec="seconds"
+    when = (
+        Measurable._wall_origin
+        + timedelta(seconds=12345.0 - Measurable._monotonic_origin)
+    ).isoformat(timespec="seconds")
+    assert (
+        repr(point) == f"Monitorable({when}: minimum=0.0, measured=50.0, maximum=90.0)"
     )
-    assert repr(point) == f"Monitorable({when}: minimum=0.0, measured=50.0, maximum=90.0)"

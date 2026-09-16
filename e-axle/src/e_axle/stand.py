@@ -63,16 +63,35 @@ class Motor(Component):
     control_mode: Controllable[Literal["torque", "speed", "current"]]
     temperature: Monitorable[float]
 
-    def __init__(self, name: str, controller: InstroMotorController, config: DutControllerConfig | LoadControllerConfig) -> None:
+    def __init__(
+        self,
+        name: str,
+        controller: InstroMotorController,
+        config: DutControllerConfig | LoadControllerConfig,
+    ) -> None:
         """Build this motor's channels from its config, hold a reference to its controller, and
         register (but do not start) this motor's background resend daemon function."""
         super().__init__(name)
         self.controller = controller
-        self.torque = ControllableNumeric(default=config.torque.default, minimum=config.torque.minimum, maximum=config.torque.maximum)
-        self.speed = ControllableNumeric(default=config.speed.default, minimum=config.speed.minimum, maximum=config.speed.maximum)
-        self.current = ControllableNumeric(default=config.current.default, minimum=config.current.minimum, maximum=config.current.maximum)
+        self.torque = ControllableNumeric(
+            default=config.torque.default,
+            minimum=config.torque.minimum,
+            maximum=config.torque.maximum,
+        )
+        self.speed = ControllableNumeric(
+            default=config.speed.default,
+            minimum=config.speed.minimum,
+            maximum=config.speed.maximum,
+        )
+        self.current = ControllableNumeric(
+            default=config.current.default,
+            minimum=config.current.minimum,
+            maximum=config.current.maximum,
+        )
         self.control_mode = Controllable(default="torque")
-        self.temperature = Monitorable(minimum=config.temperature.minimum, maximum=config.temperature.maximum)
+        self.temperature = Monitorable(
+            minimum=config.temperature.minimum, maximum=config.temperature.maximum
+        )
         self.command_enabled: Callable[[], bool] | None = None
         self._effective_kt = self.torque.maximum / self.current.maximum
         controller.add_background_daemon_function(self.command)
@@ -118,7 +137,9 @@ class Motor(Component):
     @property
     def active_channel(self) -> ControllableNumeric:
         """The channel currently being commanded, per this motor's control mode."""
-        return {"torque": self.torque, "speed": self.speed, "current": self.current}[self.control_mode.setpoint]
+        return {"torque": self.torque, "speed": self.speed, "current": self.current}[
+            self.control_mode.setpoint
+        ]
 
 
 class Source(Component):
@@ -136,8 +157,16 @@ class Source(Component):
         super().__init__(name)
         self.driver = driver
         self._channel = config.psu_channel_number
-        self.voltage = ControllableNumeric(default=config.voltage.default, minimum=config.voltage.minimum, maximum=config.voltage.maximum)
-        self.current = ControllableNumeric(default=config.current.default, minimum=config.current.minimum, maximum=config.current.maximum)
+        self.voltage = ControllableNumeric(
+            default=config.voltage.default,
+            minimum=config.voltage.minimum,
+            maximum=config.voltage.maximum,
+        )
+        self.current = ControllableNumeric(
+            default=config.current.default,
+            minimum=config.current.minimum,
+            maximum=config.current.maximum,
+        )
         self.enabled = Controllable(default=config.enabled.default)
         # Commandable, not monitorable: this is a configured protection *threshold*
         # readback (did our write land?), not a measured safety quantity -- it must
@@ -187,8 +216,12 @@ class Source(Component):
         self.driver.set_voltage(self.voltage.setpoint, channel=self._channel)
         self.driver.set_current_limit(self.current.setpoint, channel=self._channel)
         self.driver.output_enable(self.enabled.setpoint, channel=self._channel)
-        self.driver.set_overvoltage_protection_level(self.ovp_limit.setpoint, channel=self._channel)
-        self.driver.set_overcurrent_protection_level(self.ocp_limit.setpoint, channel=self._channel)
+        self.driver.set_overvoltage_protection_level(
+            self.ovp_limit.setpoint, channel=self._channel
+        )
+        self.driver.set_overcurrent_protection_level(
+            self.ocp_limit.setpoint, channel=self._channel
+        )
 
 
 class Sink(Component):
@@ -204,8 +237,16 @@ class Sink(Component):
         super().__init__(name)
         self.driver = driver
         self._channel = config.psu_channel_number
-        self.voltage = ControllableNumeric(default=config.voltage.default, minimum=config.voltage.minimum, maximum=config.voltage.maximum)
-        self.current = ControllableNumeric(default=config.current.default, minimum=config.current.minimum, maximum=config.current.maximum)
+        self.voltage = ControllableNumeric(
+            default=config.voltage.default,
+            minimum=config.voltage.minimum,
+            maximum=config.voltage.maximum,
+        )
+        self.current = ControllableNumeric(
+            default=config.current.default,
+            minimum=config.current.minimum,
+            maximum=config.current.maximum,
+        )
         self.enabled = Controllable(default=config.enabled.default)
         driver.add_background_daemon_function(self.command)
         driver.add_background_daemon_function(self.refresh)
@@ -235,7 +276,11 @@ class Sink(Component):
 
     def command(self) -> None:
         """Send this sink's setpoints to the load."""
-        self.driver.set_level(self.voltage.setpoint, channel=self._channel, curr_limit=self.current.setpoint)
+        self.driver.set_level(
+            self.voltage.setpoint,
+            channel=self._channel,
+            curr_limit=self.current.setpoint,
+        )
         self.driver.output_enable(self.enabled.setpoint, channel=self._channel)
 
 
@@ -253,7 +298,6 @@ class EAxleStandState(Enum):
 
 
 class EAxleStand:
-
     _state: EAxleStandState
     config: EAxleStandConfig
     dut: Motor
@@ -320,9 +364,19 @@ class EAxleStand:
         """Build every instrument from already-constructed instro instances plus config."""
         return cls(
             config,
-            dut=Motor(name="dut", controller=dut_controller, config=config.dut_controller),
-            left_load=Motor(name="left_load", controller=left_load_controller, config=config.left_load_controller),
-            right_load=Motor(name="right_load", controller=right_load_controller, config=config.right_load_controller),
+            dut=Motor(
+                name="dut", controller=dut_controller, config=config.dut_controller
+            ),
+            left_load=Motor(
+                name="left_load",
+                controller=left_load_controller,
+                config=config.left_load_controller,
+            ),
+            right_load=Motor(
+                name="right_load",
+                controller=right_load_controller,
+                config=config.right_load_controller,
+            ),
             source=Source(name="source", driver=source_driver, config=config.source),
             sink=Sink(name="sink", driver=sink_driver, config=config.sink),
         )
@@ -345,12 +399,16 @@ class EAxleStand:
         for instrument in (self.dut, self.left_load, self.right_load):
             instrument.open()
         booted = self._wait_for_measurement(
-            self.dut.temperature, self.left_load.temperature, self.right_load.temperature,
+            self.dut.temperature,
+            self.left_load.temperature,
+            self.right_load.temperature,
             timeout=self._boot_timeout_s,
             refresh=(self.dut.refresh, self.left_load.refresh, self.right_load.refresh),
         )
         if not booted:
-            raise TimeoutError("Motor controllers did not report telemetry within the boot timeout.")
+            raise TimeoutError(
+                "Motor controllers did not report telemetry within the boot timeout."
+            )
         self.state = EAxleStandState.ARMED
 
     def close(self) -> None:
@@ -362,8 +420,18 @@ class EAxleStand:
         self.state = EAxleStandState.DISARMING
         self.source.enabled.setpoint = False
         self.source.command()
-        self._wait_for_setpoint(self.source.enabled, timeout=self._disarm_timeout_s, refresh=(self.source.refresh,))
-        for instrument in (self.dut, self.left_load, self.right_load, self.source, self.sink):
+        self._wait_for_setpoint(
+            self.source.enabled,
+            timeout=self._disarm_timeout_s,
+            refresh=(self.source.refresh,),
+        )
+        for instrument in (
+            self.dut,
+            self.left_load,
+            self.right_load,
+            self.source,
+            self.sink,
+        ):
             instrument.close()
         self.state = EAxleStandState.OFF
 
@@ -411,11 +479,7 @@ class EAxleStand:
             self.left_load.active_channel,
             self.right_load.active_channel,
             timeout=self._stop_timeout_s,
-            refresh=(
-                self.dut.refresh, 
-                self.left_load.refresh, 
-                self.right_load.refresh
-            ),
+            refresh=(self.dut.refresh, self.left_load.refresh, self.right_load.refresh),
         )
         if not ramped_down:
             self._trip_stop()
@@ -456,27 +520,47 @@ class EAxleStand:
     def _on_trip(self, name: str, channel: Monitorable[Any]) -> None:
         """React to channel becoming tripped, appropriately for the current state."""
         logger.warning(
-            "%s tripped: measured=%s outside [%s, %s]", name, channel.measured, channel.minimum, channel.maximum
+            "%s tripped: measured=%s outside [%s, %s]",
+            name,
+            channel.measured,
+            channel.minimum,
+            channel.maximum,
         )
         if self.state in (EAxleStandState.ARMED, EAxleStandState.ARMING):
             with self._trip_lock:
-                if self.state not in (EAxleStandState.TRIP_STOPPING, EAxleStandState.TRIPPED):
+                if self.state not in (
+                    EAxleStandState.TRIP_STOPPING,
+                    EAxleStandState.TRIPPED,
+                ):
                     self.state = EAxleStandState.TRIPPED
         elif self.state in (EAxleStandState.RUNNING, EAxleStandState.STOPPING):
             self._trip_stop()
 
     def _wire_trip_delegates(self) -> None:
         """Register a named _on_trip handler on every Monitorable channel across all five instruments."""
-        for instrument in (self.dut, self.left_load, self.right_load, self.source, self.sink):
+        for instrument in (
+            self.dut,
+            self.left_load,
+            self.right_load,
+            self.source,
+            self.sink,
+        ):
             for attr, channel in vars(instrument).items():
                 if isinstance(channel, Monitorable):
-                    channel.on_trip = partial(self._on_trip, f"{instrument.name}.{attr}")
+                    channel.on_trip = partial(
+                        self._on_trip, f"{instrument.name}.{attr}"
+                    )
 
     def _wire_command_interlock(self) -> None:
         """Wire every motor's command_enabled to whether the stand is RUNNING, STOPPING, or TRIP_STOPPING."""
         for motor in (self.dut, self.left_load, self.right_load):
-            motor.command_enabled = lambda: self.state in (
-                EAxleStandState.RUNNING, EAxleStandState.STOPPING, EAxleStandState.TRIP_STOPPING
+            motor.command_enabled = lambda: (
+                self.state
+                in (
+                    EAxleStandState.RUNNING,
+                    EAxleStandState.STOPPING,
+                    EAxleStandState.TRIP_STOPPING,
+                )
             )
 
     def disarm(self) -> None:
@@ -489,10 +573,18 @@ class EAxleStand:
         """Clear a confirmed trip and re-arm."""
         if self.state != EAxleStandState.TRIPPED:
             raise ValueError(f"reset() requires TRIPPED, not {self.state}")
-        for instrument in (self.dut, self.left_load, self.right_load, self.source, self.sink):
+        for instrument in (
+            self.dut,
+            self.left_load,
+            self.right_load,
+            self.source,
+            self.sink,
+        ):
             instrument.refresh()
         if self.tripped:
-            raise ValueError(f"Cannot reset while still tripped: {self.tripped_channels()}")
+            raise ValueError(
+                f"Cannot reset while still tripped: {self.tripped_channels()}"
+            )
         self.state = EAxleStandState.ARMED
 
     def _wait_for_setpoint(

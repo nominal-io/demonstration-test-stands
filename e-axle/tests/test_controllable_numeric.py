@@ -52,7 +52,10 @@ def test_controllable_numeric_unbounded_by_default():
 def test_controllable_numeric_repr_shows_requested_when_clamped():
     channel = ControllableNumeric(default=5.0, minimum=0.0, maximum=10.0)
     channel.setpoint = 50.0
-    assert repr(channel) == "ControllableNumeric(None: requested=50.0, setpoint=10.0, measured=None)"
+    assert (
+        repr(channel)
+        == "ControllableNumeric(None: requested=50.0, setpoint=10.0, measured=None)"
+    )
 
 
 def test_controllable_numeric_repr_omits_requested_when_not_clamped():

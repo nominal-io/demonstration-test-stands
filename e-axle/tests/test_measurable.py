@@ -15,7 +15,7 @@ def test_measurable_default_construction():
 def test_measurable_timestamp_is_not_settable():
     point = Measurable()
     with pytest.raises(AttributeError):
-        point.timestamp = 5.0 # ty: ignore[invalid-assignment]
+        point.timestamp = 5.0  # ty: ignore[invalid-assignment]
 
 
 def test_measurable_timestamp_set_after_measurement():
@@ -57,5 +57,7 @@ def test_measurable_to_isoformat_matches_origin_conversion():
     point = Measurable()
     point.measured = 3.0
     assert point.timestamp is not None
-    expected = Measurable._wall_origin + timedelta(seconds=point.timestamp - Measurable._monotonic_origin)
+    expected = Measurable._wall_origin + timedelta(
+        seconds=point.timestamp - Measurable._monotonic_origin
+    )
     assert point.to_isoformat() == expected.isoformat(timespec="seconds")
