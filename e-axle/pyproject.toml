@@ -7,8 +7,11 @@ authors = [{ name = "Mick Harrigan", email = "michael.harrigan@fslabs.ca" }]
 requires-python = ">=3.13"
 dependencies = [
   "gs-usb>=0.3.1",
+  "instro-unstable>=1.11.0",
+  "instro[unstable]>=1.20.0",
   "python-can>=4.6.1",
   "pyusb>=1.3.1",
+  "pyyaml>=6.0.3",
   "rich>=15.0.0",
 ]
 
@@ -18,3 +21,8 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 gs-usb = { git = "https://github.com/MickHarrigan/gs_usb", branch = "mh/fix/optional-start-reset" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
