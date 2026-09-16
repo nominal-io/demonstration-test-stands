@@ -1,18 +1,25 @@
-from abc import ABC, abstractmethod
 import logging
 import threading
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from enum import Enum, auto
 from functools import partial
 from time import monotonic, sleep
 from types import TracebackType
-from enum import Enum, auto
-from typing import Any, Callable, Literal
+from typing import Any, Literal, Self
 
 from instro.eload import InstroELoad, LoadMode
 from instro.psu import InstroPSU
 from instro.unstable.motorcontroller import InstroMotorController
 
-from channels import Controllable, ControllableNumeric, Measurable, Monitorable
-from stand_config import DutControllerConfig, EAxleStandConfig, LoadControllerConfig, SinkConfig, SourceConfig
+from e_axle.channels import Controllable, ControllableNumeric, Measurable, Monitorable
+from e_axle.stand_config import (
+    DutControllerConfig,
+    EAxleStandConfig,
+    LoadControllerConfig,
+    SinkConfig,
+    SourceConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +347,7 @@ class EAxleStand:
             instrument.close()
         self.state = EAxleStandState.OFF
 
-    def __enter__(self) -> "EAxleStand":
+    def __enter__(self) -> Self:
         """Open the stand and return it."""
         self.open()
         return self

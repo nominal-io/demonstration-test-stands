@@ -1,6 +1,6 @@
 import math
 
-import e_axle.units as units
+from e_axle import units
 
 
 def test_mechanical_rpm_to_erpm():

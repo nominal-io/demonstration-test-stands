@@ -15,7 +15,7 @@ def test_measurable_default_construction():
 def test_measurable_timestamp_is_not_settable():
     point = Measurable()
     with pytest.raises(AttributeError):
-        point.timestamp = 5.0
+        point.timestamp = 5.0 # ty: ignore[invalid-assignment]
 
 
 def test_measurable_timestamp_set_after_measurement():

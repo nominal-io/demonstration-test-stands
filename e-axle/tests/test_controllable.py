@@ -31,7 +31,7 @@ def test_controllable_measured_roundtrip():
 def test_controllable_default_is_read_only():
     point = Controllable(default=1.0)
     with pytest.raises(AttributeError):
-        point.default = 5.0
+        point.default = 5.0 # ty: ignore[invalid-assignment]
 
 
 def test_controllable_not_at_setpoint_when_unmeasured():

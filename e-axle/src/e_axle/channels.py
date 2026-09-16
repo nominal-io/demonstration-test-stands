@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from math import inf
 from time import monotonic
-from typing import Callable, ClassVar, Generic, Protocol, TypeVar
-
+from typing import ClassVar, Protocol, TypeVar
 
 T = TypeVar("T")
 
@@ -15,7 +15,7 @@ class Comparable(Protocol):
 TOrdered = TypeVar("TOrdered", bound=Comparable)
 
 
-class Measurable(Generic[T]):
+class Measurable[T]:
     """A quantity whose actual measured value is tracked."""
 
     _monotonic_origin: ClassVar[float]
@@ -53,7 +53,7 @@ class Measurable(Generic[T]):
 
 
 Measurable._monotonic_origin = monotonic()
-Measurable._wall_origin = datetime.now()
+Measurable._wall_origin = datetime.now(UTC)
 
 
 class Controllable(Measurable[T]):
@@ -109,7 +109,7 @@ class Monitorable(Measurable[TOrdered]):
             raise ValueError(f"minimum {minimum} is greater than maximum {maximum}")
         self._minimum = minimum
         self._maximum = maximum
-        self.on_trip: Callable[["Monitorable[TOrdered]"], None] | None = None
+        self.on_trip: Callable[[Monitorable[TOrdered]], None] | None = None
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.to_isoformat()}: minimum={self.minimum}, measured={self.measured}, maximum={self.maximum})"

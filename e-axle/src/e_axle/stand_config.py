@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 import yaml
 
@@ -8,7 +8,7 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ControllableConfig(Generic[T]):
+class ControllableConfig[T]:
     default: T
 
 @dataclass(frozen=True)

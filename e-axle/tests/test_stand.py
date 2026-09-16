@@ -3,6 +3,10 @@ from functools import partial
 from typing import Any, cast
 
 import pytest
+from instro.eload import InstroELoad, LoadMode
+from instro.lib import Measurement
+from instro.psu import InstroPSU
+from instro.unstable.motorcontroller import InstroMotorController
 
 from e_axle.channels import Controllable, Monitorable
 from e_axle.stand import EAxleStand, EAxleStandState, Motor, Sink, Source
@@ -16,10 +20,6 @@ from e_axle.stand_config import (
     SinkConfig,
     SourceConfig,
 )
-from instro.eload import InstroELoad, LoadMode
-from instro.lib import Measurement
-from instro.psu import InstroPSU
-from instro.unstable.motorcontroller import InstroMotorController
 
 
 def _bare_stand() -> EAxleStand:
@@ -642,7 +642,7 @@ def test_disarm_requires_armed_state():
 
 
 def test_disarm_transitions_to_off_and_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.ARMED
     stand._disarm_timeout_s = 0.05
     stand.disarm()
@@ -659,9 +659,9 @@ def test_disarm_transitions_to_off_and_disconnects():
 def _stand_with_motors() -> tuple[EAxleStand, _FakeMotor, _FakeMotor, _FakeMotor]:
     stand = _bare_stand()
     dut, left_load, right_load = _FakeMotor(), _FakeMotor(), _FakeMotor()
-    setattr(stand, "dut", dut)
-    setattr(stand, "left_load", left_load)
-    setattr(stand, "right_load", right_load)
+    stand.dut = dut
+    stand.left_load = left_load
+    stand.right_load = right_load
     return stand, dut, left_load, right_load
 
 
@@ -683,7 +683,7 @@ def test_run_commands_every_motor_and_transitions_to_running():
 
 
 def test_command_interlock_blocks_transmission_while_armed():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.ARMED
     stand.dut.torque.setpoint = 15.0
@@ -692,7 +692,7 @@ def test_command_interlock_blocks_transmission_while_armed():
 
 
 def test_command_interlock_permits_transmission_once_running():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.RUNNING
     stand.dut.torque.setpoint = 15.0
@@ -720,7 +720,7 @@ def test_command_interlock_blocks_transmission_once_tripped():
 
 
 def test_run_with_interlock_wired_actually_transmits():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.ARMED
     stand.dut.torque.setpoint = 15.0
@@ -760,13 +760,13 @@ def _full_stand() -> tuple[EAxleStand, _FakeController, _FakeController, _FakeCo
     dut_ctrl = _FakeController("dut")
     left_ctrl = _FakeController("left_load")
     right_ctrl = _FakeController("right_load")
-    setattr(stand, "dut", _make_motor(dut_ctrl))
-    setattr(stand, "left_load", _make_motor(left_ctrl))
-    setattr(stand, "right_load", _make_motor(right_ctrl))
+    stand.dut = _make_motor(dut_ctrl)
+    stand.left_load = _make_motor(left_ctrl)
+    stand.right_load = _make_motor(right_ctrl)
     psu = _FakePSUDriver()
-    setattr(stand, "source", _make_source(psu))
+    stand.source = _make_source(psu)
     eload = _FakeELoadDriver()
-    setattr(stand, "sink", _make_sink(eload))
+    stand.sink = _make_sink(eload)
     stand._arm_timeout_s = 1.0
     stand._stop_timeout_s = 1.0
     stand._trip_stop_timeout_s = 1.0
@@ -796,7 +796,7 @@ def test_arm_transitions_to_armed_when_confirmed():
 
 
 def test_arm_raises_when_motors_never_report_telemetry():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, *_ = _full_stand()
     stand.state = EAxleStandState.OFF
     stand._boot_timeout_s = 0.05
     with pytest.raises(TimeoutError):
@@ -811,7 +811,7 @@ def test_stop_requires_running_state():
 
 
 def test_stop_transitions_to_armed_when_ramped_down():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_current": [0.0]}, timestamps=[1])
     left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_current": [0.0]}, timestamps=[1])
@@ -831,7 +831,7 @@ def test_stop_trips_when_ramp_never_completes():
 
 
 def test_stop_commands_zero_even_when_motor_default_is_nonzero():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
@@ -895,7 +895,7 @@ def test_trip_stop_settles_into_tripped_even_without_confirmation():
 
 
 def test_trip_stop_settles_into_tripped_when_confirmed():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 1.0
     dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_current": [0.0]}, timestamps=[1])
@@ -957,7 +957,7 @@ def test_open_commands_source_enabled_and_opens_every_instrument_when_controller
 
 
 def test_open_raises_when_controllers_never_report_telemetry():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.OFF
     stand._boot_timeout_s = 0.05
     psu.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1])
@@ -980,7 +980,7 @@ def test_close_from_off_is_a_noop():
 
 
 def test_close_from_running_trip_stops_then_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 0.05
     stand._disarm_timeout_s = 0.05
@@ -1019,7 +1019,7 @@ def test_close_disconnects_even_when_still_tripped_after_trip_stop():
 
 
 def test_close_from_already_tripped_does_not_re_trip_but_still_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.TRIPPED
     stand._disarm_timeout_s = 0.05
     stand.close()
