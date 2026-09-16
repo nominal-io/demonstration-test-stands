@@ -24,11 +24,11 @@ power supply's own reading as truth for real power accounting; these numbers are
 for control and protection.
 
 Usage:
-    python comms_check.py                          # gs_usb (candlelight), default
-    python comms_check.py --raw                    # dump raw frames instead
-    python comms_check.py --tau 0.8                # slower/faster display filter
-    python comms_check.py --interface slcan --channel COM5   # if reflashed
-    python comms_check.py --listen-only            # disable TX entirely
+    uv run comms_check.py                          # gs_usb (candlelight), default
+    uv run comms_check.py --raw                    # dump raw frames instead
+    uv run comms_check.py --tau 0.8                # slower/faster display filter
+    uv run comms_check.py --interface slcan --channel COM5   # if reflashed
+    uv run comms_check.py --listen-only            # disable TX entirely
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -49,19 +49,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from e_axle.constants import NODES
+
 TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
 
 # --------------------------------------------------------------------------
 # Stand configuration
 # --------------------------------------------------------------------------
-
-# vesc_id -> (display name, pole pairs, gear ratio from motor to output shaft)
-NODES: dict[int, tuple[str, int, float]] = {
-    0: ("DUT", 3, 9.5),      # E-Axle traction motor, 6 poles, 9.5:1 final drive
-    1: ("DMC-L", 7, 1.0),    # Dyno left,  MP 8055, 14 poles, direct to half shaft
-    2: ("DMC-R", 7, 1.0),    # Dyno right, MP 8055, 14 poles, direct to half shaft
-}
 
 STALE_AFTER_S = 0.5    # node flagged STALE if silent this long
 STOP_TX_HZ = 50.0      # rate at which zero commands are repeated while latched

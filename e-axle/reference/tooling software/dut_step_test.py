@@ -2,7 +2,7 @@
 """
 dut_step_test.py - automated stepped speed sequence for the E-Axle DUT.
 
-Profile: step from 0 to 12,000 ERPM (4,000 mechanical RPM) in 1,000 ERPM
+Profile: step from 0 to 12,000 ERPM (330 RPM at the carrier) in 1,000 ERPM
 increments held 2 s each, then hold 12,000 ERPM for 30 s, then release.
 Total run time about 52 s.
 
@@ -23,10 +23,10 @@ Every run writes a CSV to ./logs/ with raw (unfiltered) telemetry at the full
 status rate, including aborted runs.
 
 Usage:
-    python dut_step_test.py
-    python dut_step_test.py --dry-run            # walk the profile, transmit nothing
-    python dut_step_test.py --top-erpm 6000      # shorter profile for a first look
-    python dut_step_test.py --interface slcan --channel COM5
+    uv run dut_step_test.py
+    uv run dut_step_test.py --dry-run            # walk the profile, transmit nothing
+    uv run dut_step_test.py --top-erpm 6000      # shorter profile for a first look
+    uv run dut_step_test.py --interface slcan --channel COM5
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -51,6 +51,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from e_axle.constants import DUT_CHAIN, DUT_ID, NODES
+
 TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
 
@@ -58,22 +60,13 @@ HAVE_KEYBOARD = sys.stdin.isatty()
 # Stand configuration
 # --------------------------------------------------------------------------
 
-# vesc_id -> (display name, pole pairs, gear ratio from motor to output shaft)
-NODES: dict[int, tuple[str, int, float]] = {
-    0: ("DUT", 3, 9.5),
-    1: ("DMC-L", 7, 1.0),
-    2: ("DMC-R", 7, 1.0),
-}
-
-DUT_ID = 0
-
 STALE_AFTER_S = 0.5
 TX_HZ = 50.0               # command transmit rate; also the watchdog feed
 DEFAULT_TAU_S = 0.4        # display filter time constant
 
 # Profile defaults
 STEP_ERPM = 1000
-TOP_ERPM = 12000           # 4,000 mechanical RPM at 3 pole pairs
+TOP_ERPM = 12000           # ERPM / DUT_CHAIN = 330 RPM at the carrier
 STEP_HOLD_S = 2.0
 TOP_HOLD_S = 30.0
 
@@ -464,7 +457,7 @@ def build_banner(seq: Sequence, dry_run: bool) -> Panel:
         bar = "#" * int(bar_w * frac) + "." * (bar_w - int(bar_w * frac))
         body = Text(
             f"RUNNING   step {seq.step_index + 1}/{len(seq.profile)}   "
-            f"setpoint {sp:,} ERPM ({sp / 3:,.0f} RPM)\n"
+            f"setpoint {sp:,} ERPM ({sp / DUT_CHAIN:,.1f} RPM at the carrier)\n"
             f"step {seq.step_elapsed:4.1f}/{hold:.0f} s      "
             f"total {seq.elapsed:5.1f}/{seq.total_duration:.0f} s\n"
             f"[{bar}]\n"
@@ -693,7 +686,7 @@ def main() -> None:
     log_path = Path(args.log_dir) / f"dut_step_{stamp}.csv"
 
     print(f"Profile: {len(profile)} steps to {args.top_erpm:,} ERPM "
-          f"({args.top_erpm / 3:,.0f} mechanical RPM), "
+          f"({args.top_erpm / DUT_CHAIN:,.1f} RPM at the carrier), "
           f"{seq.total_duration:.0f} s total")
     print(f"Opening {args.interface} on channel {args.channel} "
           f"at {args.bitrate} bps ...")

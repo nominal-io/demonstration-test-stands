@@ -33,9 +33,9 @@ BUS HEALTH
     DROPOUT                            -> genuinely controller-side
 
 Usage:
-    python dyno_test.py --dry-run
-    python dyno_test.py --tx-hz 20 --max-brake 6
-    python dyno_test.py --target-erpm 6000
+    uv run dyno_test.py --dry-run
+    uv run dyno_test.py --tx-hz 20 --max-brake 6
+    uv run dyno_test.py --target-erpm 6000
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -60,6 +60,19 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from e_axle.constants import NODES as BASE_NODES
+from e_axle.constants import (
+    DUT_CHAIN,
+    DUT_ERPM_PER_DYNO_ERPM,
+    DUT_GEAR,
+    DUT_ID,
+    DUT_KT,
+    DUT_POLE_PAIRS,
+    DYNO_IDS,
+    DYNO_KT,
+    KT_BY_ID,
+)
+
 TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
 
@@ -68,28 +81,10 @@ HAVE_KEYBOARD = sys.stdin.isatty()
 # Stand constants
 # --------------------------------------------------------------------------
 
-# MEASURED: DUT_erpm / dyno_erpm = 5.1973 (sd 0.0021) across all load levels.
-# With the dynos at 7 pole pairs that fixes the DUT chain at 36.38. Only this
-# PRODUCT is measurable from CAN data; the 4 / 9.095 split is provisional and
-# affects only motor-shaft-level figures.
-DUT_CHAIN = 36.38
-DUT_POLE_PAIRS = 4
-DUT_GEAR = DUT_CHAIN / DUT_POLE_PAIRS
-DUT_LAMBDA = 0.014423
-DUT_KT = 1.5 * DUT_POLE_PAIRS * DUT_LAMBDA
-
-DYNO_POLE_PAIRS = 7                             # physically counted, 12N14P
-DYNO_LAMBDA = 0.018148
-DYNO_KT = 1.5 * DYNO_POLE_PAIRS * DYNO_LAMBDA   # 0.1906 Nm/A
-
 NODES: dict[int, tuple[str, int, float, float]] = {
-    0: ("DUT", DUT_POLE_PAIRS, DUT_GEAR, DUT_KT),
-    1: ("DMC-L", DYNO_POLE_PAIRS, 1.0, DYNO_KT),
-    2: ("DMC-R", DYNO_POLE_PAIRS, 1.0, DYNO_KT),
+    vid: (name, pole_pairs, gear, KT_BY_ID[vid])
+    for vid, (name, pole_pairs, gear) in BASE_NODES.items()
 }
-
-DUT_ID = 0
-DYNO_IDS = (1, 2)
 
 # Frames older than this are not trusted for trip decisions. Long enough to
 # ride out a render hiccup, far shorter than the staleness trip.
@@ -841,7 +836,8 @@ def build_results_panel(nodes: dict[int, NodeState]) -> Panel:
         f"   (includes the ~198 W fixed driveline tare)",
         f"Half shafts L {dml.shaft_rpm:7.1f} RPM  R {dmr.shaft_rpm:7.1f} RPM  "
         f"spread {spread:5.1f} RPM ({spread_pct:5.1f}%, trip {SPREAD_TRIP_PCT:.0f}%)",
-        f"Chain check DUT/dyno ERPM ratio {chain:6.3f}  (expected 5.197)",
+        f"Chain check DUT/dyno ERPM ratio {chain:6.3f}  "
+        f"(expected {DUT_ERPM_PER_DYNO_ERPM:.3f})",
     ]
     style = "red" if spread_pct > SPREAD_TRIP_PCT * 0.6 else "dim"
     return Panel("\n".join(lines), title="Measured", border_style=style)
