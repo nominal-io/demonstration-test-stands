@@ -2,7 +2,7 @@
 """
 dut_step_test.py - automated stepped speed sequence for the E-Axle DUT.
 
-Profile: step from 0 to 12,000 ERPM (4,000 mechanical RPM) in 1,000 ERPM
+Profile: step from 0 to 12,000 ERPM (330 RPM at the carrier) in 1,000 ERPM
 increments held 2 s each, then hold 12,000 ERPM for 30 s, then release.
 Total run time about 52 s.
 
@@ -23,10 +23,10 @@ Every run writes a CSV to ./logs/ with raw (unfiltered) telemetry at the full
 status rate, including aborted runs.
 
 Usage:
-    python dut_step_test.py
-    python dut_step_test.py --dry-run            # walk the profile, transmit nothing
-    python dut_step_test.py --top-erpm 6000      # shorter profile for a first look
-    python dut_step_test.py --interface slcan --channel COM5
+    uv run dut_step_test.py
+    uv run dut_step_test.py --dry-run            # walk the profile, transmit nothing
+    uv run dut_step_test.py --top-erpm 6000      # shorter profile for a first look
+    uv run dut_step_test.py --interface slcan --channel COM5
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -44,52 +44,21 @@ from datetime import datetime
 from pathlib import Path
 
 import can
+from blessed import Terminal
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-try:
-    import msvcrt  # Windows only
-    _PLATFORM = "windows"
-except ImportError:
-    import select
-    import termios
-    import tty
-    _PLATFORM = "posix"
+from e_axle.constants import DUT_CHAIN, DUT_ID, NODES
 
+TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
-_posix_saved_settings = None
-
-
-def enable_raw_mode() -> None:
-    """Put stdin into cbreak mode so single keys are readable without Enter. No-op on Windows."""
-    global _posix_saved_settings
-    if _PLATFORM != "posix" or not HAVE_KEYBOARD:
-        return
-    _posix_saved_settings = termios.tcgetattr(sys.stdin.fileno())
-    tty.setcbreak(sys.stdin.fileno())
-
-
-def restore_terminal() -> None:
-    """Restore stdin's settings saved by enable_raw_mode(). No-op on Windows or if never enabled."""
-    if _PLATFORM != "posix" or _posix_saved_settings is None:
-        return
-    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _posix_saved_settings)
 
 # --------------------------------------------------------------------------
 # Stand configuration
 # --------------------------------------------------------------------------
-
-# vesc_id -> (display name, pole pairs, gear ratio from motor to output shaft)
-NODES: dict[int, tuple[str, int, float]] = {
-    0: ("DUT", 3, 9.5),
-    1: ("DMC-L", 7, 1.0),
-    2: ("DMC-R", 7, 1.0),
-}
-
-DUT_ID = 0
 
 STALE_AFTER_S = 0.5
 TX_HZ = 50.0               # command transmit rate; also the watchdog feed
@@ -97,7 +66,7 @@ DEFAULT_TAU_S = 0.4        # display filter time constant
 
 # Profile defaults
 STEP_ERPM = 1000
-TOP_ERPM = 12000           # 4,000 mechanical RPM at 3 pole pairs
+TOP_ERPM = 12000           # ERPM / DUT_CHAIN = 330 RPM at the carrier
 STEP_HOLD_S = 2.0
 TOP_HOLD_S = 30.0
 
@@ -166,30 +135,20 @@ def send_zero_all(bus: can.BusABC) -> None:
                                  data=payload, is_extended_id=True))
 
 
+ARROWS = {"KEY_UP": "UP", "KEY_DOWN": "DOWN",
+          "KEY_LEFT": "LEFT", "KEY_RIGHT": "RIGHT"}
+
+
 def poll_key() -> str | None:
     """Non-blocking single-key read. Arrow keys return 'UP', 'DOWN', etc."""
     if not HAVE_KEYBOARD:
         return None
-    if _PLATFORM == "windows":
-        if not msvcrt.kbhit():
-            return None
-        ch = msvcrt.getch()
-        if ch in (b"\x00", b"\xe0"):
-            return {b"H": "UP", b"P": "DOWN",
-                    b"K": "LEFT", b"M": "RIGHT"}.get(msvcrt.getch())
-        return ch.decode("utf-8", "ignore").lower()
-
-    if not select.select([sys.stdin], [], [], 0)[0]:
+    key = TERM.inkey(timeout=0)
+    if not key:
         return None
-    ch = sys.stdin.read(1)
-    if ch != "\x1b":  # ESC prefixes an ANSI arrow-key escape sequence
-        return ch.lower()
-    if not select.select([sys.stdin], [], [], 0)[0]:
-        return None
-    ch2 = sys.stdin.read(1)
-    if ch2 != "[" or not select.select([sys.stdin], [], [], 0)[0]:
-        return None
-    return {"A": "UP", "B": "DOWN", "C": "RIGHT", "D": "LEFT"}.get(sys.stdin.read(1))
+    if key.is_sequence:
+        return ARROWS.get(key.name)
+    return str(key).lower()
 
 
 # --------------------------------------------------------------------------
@@ -498,7 +457,7 @@ def build_banner(seq: Sequence, dry_run: bool) -> Panel:
         bar = "#" * int(bar_w * frac) + "." * (bar_w - int(bar_w * frac))
         body = Text(
             f"RUNNING   step {seq.step_index + 1}/{len(seq.profile)}   "
-            f"setpoint {sp:,} ERPM ({sp / 3:,.0f} RPM)\n"
+            f"setpoint {sp:,} ERPM ({sp / DUT_CHAIN:,.1f} RPM at the carrier)\n"
             f"step {seq.step_elapsed:4.1f}/{hold:.0f} s      "
             f"total {seq.elapsed:5.1f}/{seq.total_duration:.0f} s\n"
             f"[{bar}]\n"
@@ -727,22 +686,21 @@ def main() -> None:
     log_path = Path(args.log_dir) / f"dut_step_{stamp}.csv"
 
     print(f"Profile: {len(profile)} steps to {args.top_erpm:,} ERPM "
-          f"({args.top_erpm / 3:,.0f} mechanical RPM), "
+          f"({args.top_erpm / DUT_CHAIN:,.1f} RPM at the carrier), "
           f"{seq.total_duration:.0f} s total")
     print(f"Opening {args.interface} on channel {args.channel} "
           f"at {args.bitrate} bps ...")
 
     bus = None
-    enable_raw_mode()
     try:
-        bus = open_bus(args)
-        run(bus, seq, args.dry_run, log_path)
+        with TERM.cbreak():
+            bus = open_bus(args)
+            run(bus, seq, args.dry_run, log_path)
     except KeyboardInterrupt:
         pass
     except Exception as e:  # noqa: BLE001
         print(f"\n{e}")
     finally:
-        restore_terminal()
         if bus is not None:
             if not args.dry_run:
                 for _ in range(5):
