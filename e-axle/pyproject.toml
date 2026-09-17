@@ -20,6 +20,7 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 gs-usb = { git = "https://github.com/MickHarrigan/gs_usb", branch = "mh/fix/optional-start-reset" }
+instro = { git = "https://github.com/nominal-io/instro", branch = "main" }
 
 [dependency-groups]
 dev = [
