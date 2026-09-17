@@ -1,0 +1,306 @@
+title: E-AXLE
+window_title: null
+logo_path: null
+timeline:
+  show: false
+  display: relative
+  pixels_per_tick: 0.0
+  milestones: []
+streaming:
+  buffer_size: 5000
+  timeline: null
+  playback_speed: null
+  window: null
+  persistence: []
+  channels:
+  - channel: alarms.engine_fire
+  - channel: alarms.hyd_press_low
+  - channel: alarms.oil_press_low
+  - channel: alarms.pitot_heat
+  - channel: demo.altitude
+  - channel: demo.engine_rpm
+  - channel: demo.heading
+  - channel: demo.hydraulic_pressure
+  - channel: demo.latitude
+  - channel: demo.longitude
+  - channel: demo.oil_pressure
+  - channel: demo.oil_temperature
+  - channel: demo.pitch
+  - channel: demo.pump_flow_rate
+  - channel: demo.roll
+  - channel: demo.speed
+  - channel: stand_state.state
+python:
+  packages:
+  - e-axle
+  wheelhouse: wheels
+on_load: null
+on_unload: null
+tiles:
+- layout: tabs
+  tabs:
+  - title: CONTROL
+    allow_popout: true
+    tile:
+      layout: grid
+      rows:
+      - height: 1.3514563
+        columns:
+        - width: 0.171419
+          tile:
+            layout: pane
+            id: 11a0a371-8911-4e06-ace0-3da5edfa06ae
+            title: LEFT MOTOR CONTROL
+            direction: vertical
+            should_fill: true
+            elements:
+            - spacing: normal
+              inputs:
+              - input: number
+                id: left-torque
+                label: Torque
+                default: 0.0
+                units: Nm
+              - input: number
+                id: left-current
+                label: Current
+                default: 0.0
+                min: -20.0
+                max: 20.0
+                stepper:
+                  amount: 1.0
+                units: A
+              - input: number
+                id: left-velocity
+                label: Velocity
+                default: 0.0
+                units: RPM
+        - width: 0.10933025
+          tile:
+            layout: pane
+            id: c31ab83e-6c10-4207-8e1d-ebb709d12825
+            title: LEFT MOTOR STATE
+            direction: vertical
+            should_fill: true
+            elements:
+            - dashboard: alarms
+              stream_id: stand
+              signals:
+              - label: Torque
+                color: safe
+                channel: left.torque
+              - label: Current
+                color: safe
+                channel: left.current
+              - label: Velocity
+                color: safe
+                channel: left.speed
+              cols: 3
+              row_gap: null
+              col_gap: null
+        - width: 0.17344357
+          tile:
+            layout: pane
+            id: 8d14973f-c099-406b-849d-bbe29e8c8eaa
+            title: RIGHT MOTOR CONTROL
+            direction: vertical
+            should_fill: true
+            elements:
+            - spacing: normal
+              inputs:
+              - input: number
+                id: right-torque
+                label: Torque
+                default: 0.0
+                units: Nm
+              - input: number
+                id: right-current
+                label: Current
+                default: 0.0
+                min: -20.0
+                max: 20.0
+                stepper:
+                  amount: 1.0
+                units: A
+              - input: number
+                id: right-velocity
+                label: Velocity
+                default: 0.0
+                units: RPM
+        - width: 0.1073056
+          tile:
+            layout: pane
+            id: fdd863ef-d9bf-4c08-9911-5b375e9a6f3a
+            title: RIGHT MOTOR STATE
+            direction: vertical
+            should_fill: true
+            elements:
+            - dashboard: alarms
+              stream_id: stand
+              signals:
+              - label: Torque
+                color: safe
+                channel: right.torque
+              - label: Current
+                color: safe
+                channel: right.current
+              - label: Velocity
+                color: safe
+                channel: right.speed
+              cols: 3
+              row_gap: null
+              col_gap: null
+      - height: 0.66074
+        columns:
+        - width: 1.0
+          tile:
+            layout: pane
+            id: 86254d0d-a024-4f13-8e0b-8c2bf8347d49
+            title: DUT
+            direction: vertical
+            should_fill: true
+            elements:
+            - spacing: normal
+              inputs:
+              - input: number
+                id: dut-torque
+                label: Torque
+                default: 0.0
+                units: Nm
+              - input: number
+                id: dut-current
+                label: Current
+                default: 0.0
+                min: -20.0
+                max: 20.0
+                stepper:
+                  amount: 1.0
+                units: A
+              - input: number
+                id: dut-velocity
+                label: Velocity
+                default: 0.0
+                units: RPM
+        - width: 1.0
+          tile:
+            layout: pane
+            id: 65a9acea-7048-4371-955c-c486be6f6e5f
+            title: DUT STATE
+            direction: vertical
+            should_fill: true
+            elements:
+            - dashboard: alarms
+              stream_id: stand
+              signals:
+              - label: Torque
+                color: safe
+                channel: dut.torque
+              - label: Current
+                color: safe
+                channel: dut.current
+              - label: Velocity
+                color: safe
+                channel: dut.speed
+              cols: 3
+              row_gap: null
+              col_gap: null
+      - height: 0.45045722
+        columns:
+        - width: null
+          tile:
+            layout: pane
+            id: 05f80ee0-e730-4a14-839b-4b52308806b2
+            title: SOURCE
+            direction: vertical
+            should_fill: true
+            elements:
+            - spacing: normal
+              inputs:
+              - input: toggle_switch
+                id: source-enable
+                on_label: Enabled
+                off_label: Disabled
+                off_color: rgb(255, 0, 0)
+                on_color: rgb(0, 255, 0)
+        - width: null
+          tile:
+            layout: pane
+            id: c64f80f3-82db-4f97-b491-b1e1a9108508
+            title: SINK
+            direction: vertical
+            should_fill: true
+            elements:
+            - spacing: normal
+              inputs:
+              - input: toggle_switch
+                id: sink-enable
+                on_label: Enabled
+                off_label: Disabled
+                off_color: rgb(255, 0, 0)
+                on_color: rgb(0, 255, 0)
+  - title: VISUALIZATION
+    allow_popout: true
+    tile:
+      layout: pane
+      id: cd1a4ddd-8aa2-4dd3-8aa8-644da4915d8c
+      title: Line Plot
+      direction: vertical
+      should_fill: true
+      elements:
+      - plot: line
+        stream_id: stand
+        colors: []
+        legend_placement: bottom_left
+        x_format: timestamp
+        x_time_display: Local
+        x_scale: linear
+        y_scale: linear
+        time_window: 30s
+  - title: SCRIPTS
+    allow_popout: true
+    tile:
+      layout: pane
+      id: bace44a7-72ad-47af-bc0b-b8e35fcd33bc
+      title: Script Controls
+      direction: vertical
+      should_fill: true
+      elements:
+      - controls: script_table
+        scripts:
+        - label: Stand Control
+          path: stand_control.py
+          args: []
+          max_log_lines: 10000
+          id: null
+        show_output_column: true
+  - title: Untitled Tab
+    allow_popout: true
+    tile:
+      layout: pane
+      id: c7483b60-3c88-474c-8e3c-ab89a79474ae
+      title: STAND
+      direction: vertical
+      should_fill: true
+      elements:
+      - spacing: normal
+        inputs:
+        - input: dropdown
+          id: stand-state
+          label: Requested State
+          options:
+          - Disarmed
+          - Armed
+          - Running
+          default: Disarmed
+        - display: stream_value
+          title: State
+          stream_id: stand_state
+          channel: state
+left_panel: null
+right_panel: null
+bottom_panel: null
+scene: {}
+poster: null
+prompt_windows: []
+mcap_path: null
+conditionals: []
