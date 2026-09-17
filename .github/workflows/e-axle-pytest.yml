@@ -1,0 +1,37 @@
+name: Run E-Axle Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'e-axle/**'
+  pull_request:
+    paths:
+      - 'e-axle/**'
+
+jobs:
+  test:
+    name: Run E-Axle Unit Tests on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: e-axle
+
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+        cache-dependency-glob: e-axle/uv.lock
+
+    - name: Install dependencies
+      run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
