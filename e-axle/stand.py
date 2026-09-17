@@ -1,4 +1,7 @@
+from abc import ABC
+import logging
 import threading
+from functools import partial
 from time import monotonic, sleep
 from types import TracebackType
 from enum import Enum, auto
@@ -11,11 +14,26 @@ from instro.unstable.motorcontroller import InstroMotorController
 from channels import Controllable, ControllableNumeric, Measurable, Monitorable
 from stand_config import DutControllerConfig, EAxleStandConfig, LoadControllerConfig, SinkConfig, SourceConfig
 
+logger = logging.getLogger(__name__)
 
-class Motor:
+class Component(ABC):
+    name: str
+
+    def __init__(self, name: str) -> None:
+        """Give this component a name prefix for its channels."""
+        self.name = name
+
+    def get_telemetry(self) -> dict[str, Any]:
+        """Return a dict of all channels' measured values, keyed by their full name."""
+        return {
+            f"{self.name}.{attr}": channel.measured
+            for attr, channel in vars(self).items()
+            if isinstance(channel, Measurable)
+        }
+    
+class Motor(Component):
     """One motor controller's channels and control logic: torque, speed, current, active mode, and temperature."""
 
-    name: str
     controller: InstroMotorController
     torque: ControllableNumeric
     speed: ControllableNumeric
@@ -26,7 +44,7 @@ class Motor:
     def __init__(self, name: str, controller: InstroMotorController, config: DutControllerConfig | LoadControllerConfig) -> None:
         """Build this motor's channels from its config, hold a reference to its controller, and
         register (but do not start) this motor's background resend daemon function."""
-        self.name = name
+        super().__init__(name)
         self.controller = controller
         self.torque = ControllableNumeric(default=config.torque.default, minimum=config.torque.minimum, maximum=config.torque.maximum)
         self.speed = ControllableNumeric(default=config.speed.default, minimum=config.speed.minimum, maximum=config.speed.maximum)
@@ -89,10 +107,9 @@ class Motor:
         ]
 
 
-class Source:
+class Source(Component):
     """The bidirectional supply's source quadrant: voltage, current, enable, and protection limits."""
 
-    name: str
     driver: InstroPSU
     voltage: ControllableNumeric
     current: ControllableNumeric
@@ -102,7 +119,7 @@ class Source:
 
     def __init__(self, name: str, driver: InstroPSU, config: SourceConfig) -> None:
         """Build this source's channels from its config and hold a reference to its driver."""
-        self.name = name
+        super().__init__(name)
         self.driver = driver
         self._channel = config.psu_channel_number
         self.voltage = ControllableNumeric(default=config.voltage.default, minimum=config.voltage.minimum, maximum=config.voltage.maximum)
@@ -167,10 +184,9 @@ class Source:
         ]
 
 
-class Sink:
+class Sink(Component):
     """The bidirectional supply's sink quadrant: voltage (CV setpoint), current (limit), and enable."""
 
-    name: str
     driver: InstroELoad
     voltage: ControllableNumeric
     current: ControllableNumeric
@@ -178,7 +194,7 @@ class Sink:
 
     def __init__(self, name: str, driver: InstroELoad, config: SinkConfig) -> None:
         """Build this sink's channels from its config and hold a reference to its driver."""
-        self.name = name
+        super().__init__(name)
         self.driver = driver
         self._channel = config.psu_channel_number
         self.voltage = ControllableNumeric(default=config.voltage.default, minimum=config.voltage.minimum, maximum=config.voltage.maximum)
@@ -238,7 +254,7 @@ class EAxleStandState(Enum):
 
 class EAxleStand:
 
-    state: EAxleStandState
+    _state: EAxleStandState
     config: EAxleStandConfig
     dut: Motor
     left_load: Motor
@@ -251,6 +267,17 @@ class EAxleStand:
     _trip_stop_timeout_s: float
     _boot_timeout_s: float
     _trip_lock: threading.Lock
+
+    @property
+    def state(self) -> EAxleStandState:
+        """The stand's current state."""
+        return self._state
+
+    @state.setter
+    def state(self, value: EAxleStandState) -> None:
+        """Set the stand's state, logging the transition."""
+        logger.info("state %s -> %s", getattr(self, "_state", None), value)
+        self._state = value
 
     def __init__(
         self,
@@ -288,7 +315,7 @@ class EAxleStand:
         self.source.open()
         self.sink.open()
         self.source.voltage.setpoint = self.source.voltage.default
-        self.source.current.setpoint = self.source.current.default
+        self.source.current.setpoint = self.source.current.maximum
         self.source.enabled.setpoint = True
         self.source.command()
         for instrument in (self.dut, self.left_load, self.right_load):
@@ -402,8 +429,9 @@ class EAxleStand:
         )
         self.state = EAxleStandState.TRIPPED
 
-    def _on_trip(self, channel: Monitorable[Any]) -> None:
+    def _on_trip(self, name: str, channel: Monitorable[Any]) -> None:
         """React to channel becoming tripped, appropriately for the current state."""
+        logger.warning("%s tripped: %r", name, channel)
         if self.state in (EAxleStandState.ARMED, EAxleStandState.ARMING):
             with self._trip_lock:
                 if self.state not in (EAxleStandState.TRIP_STOPPING, EAxleStandState.TRIPPED):
@@ -412,11 +440,11 @@ class EAxleStand:
             self._trip_stop()
 
     def _wire_trip_delegates(self) -> None:
-        """Register _on_trip on every Monitorable channel across all five instruments."""
+        """Register a named _on_trip handler on every Monitorable channel across all five instruments."""
         for instrument in (self.dut, self.left_load, self.right_load, self.source, self.sink):
-            for channel in vars(instrument).values():
+            for attr, channel in vars(instrument).items():
                 if isinstance(channel, Monitorable):
-                    channel.on_trip = self._on_trip
+                    channel.on_trip = partial(self._on_trip, f"{instrument.name}.{attr}")
 
     def _wire_command_interlock(self) -> None:
         """Wire every motor's command_enabled to whether the stand is RUNNING, STOPPING, or TRIP_STOPPING."""
