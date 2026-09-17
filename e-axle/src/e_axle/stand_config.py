@@ -1,10 +1,14 @@
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from typing import TypeVar
 
 import yaml
 
 T = TypeVar("T")
+
+DEFAULT_CONFIG_RESOURCE = "nominal_config.yaml"
+"""Name of the config shipped inside the package -- see `EAxleStandConfig.default`."""
 
 
 @dataclass(frozen=True)
@@ -96,10 +100,24 @@ class EAxleStandConfig:
     boot_timeout_s: float
 
     @classmethod
+    def default(cls) -> "EAxleStandConfig":
+        """Load the config shipped inside the package.
+
+        Read through `importlib.resources` rather than a filesystem path so this works
+        from an installed (zipped) wheel, where no `nominal_config.yaml` sits on disk.
+        These are defaults -- several bounds are still PLACEHOLDERs -- so a stand that
+        needs different limits should override them via `from_yaml`.
+        """
+        with (files(__package__) / DEFAULT_CONFIG_RESOURCE).open() as f:
+            return cls._from_dict(yaml.safe_load(f))
+
+    @classmethod
     def from_yaml(cls, path: str | Path) -> "EAxleStandConfig":
         with open(path) as f:
-            data = yaml.safe_load(f)
+            return cls._from_dict(yaml.safe_load(f))
 
+    @classmethod
+    def _from_dict(cls, data: dict) -> "EAxleStandConfig":
         return cls(
             disarm_timeout_s=data["disarm_timeout_s"],
             arm_timeout_s=data["arm_timeout_s"],

@@ -1,13 +1,9 @@
-from pathlib import Path
-
 from e_axle.channels import Controllable, ControllableNumeric, Monitorable
 from e_axle.stand_config import EAxleStandConfig
 
-_CONFIG_PATH = Path(__file__).parent.parent / "nominal_config.yaml"
-
 
 def _nominal_config() -> EAxleStandConfig:
-    return EAxleStandConfig.from_yaml(_CONFIG_PATH)
+    return EAxleStandConfig.default()
 
 
 def test_nominal_config_initializes_every_stand_channel():
