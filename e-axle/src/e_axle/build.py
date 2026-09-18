@@ -12,6 +12,7 @@ from instro.psu.drivers.ea_psb10000 import EAPSB10000Visa
 from instro.unstable.motorcontroller import InstroMotorController
 from instro.unstable.motorcontroller.drivers.vesc_6 import VESC6
 from instro.unstable.transports.can import CanConfig, CanTransport
+from instro.lib.publishers.nominal_core import NominalCorePublisher
 
 from e_axle.stand import EAxleStand
 from e_axle.stand_config import EAxleStandConfig
@@ -20,6 +21,7 @@ NETWORK_ADDRESS = "TCPIP0::192.168.0.3::5025::SOCKET"
 MOTOR_INTERVAL_S = 0.06  # VESC6 recommends >=10 Hz; its firmware times out a motor after 0.5s of silence
 PSB_INTERVAL_S = 0.5  # The PSB's SCPI interface cannot service the motor rate, and needs no resend to hold its setpoints
 
+CORE_RID = "ri.catalog.cerulean-staging.dataset.247ceceb-39dc-4581-a128-a15ed4788e38"
 
 def build_stand(
     config: EAxleStandConfig | None = None,
@@ -53,7 +55,9 @@ def build_stand(
     motors = (dut_controller, left_load_controller, right_load_controller)
     for motor in motors:
         motor.background_interval = motor_interval_s
+        motor.add_publisher(NominalCorePublisher(CORE_RID))
     for supply in (source_driver, sink_driver):
         supply.background_interval = psb_interval_s
+        supply.add_publisher(NominalCorePublisher(CORE_RID))
 
     return EAxleStand.from_drivers(config, *motors, source_driver, sink_driver)
