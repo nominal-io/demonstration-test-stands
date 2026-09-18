@@ -364,8 +364,6 @@ def test_source_refresh_does_nothing_when_no_telemetry():
     assert source.voltage.measured is None
     assert source.current.measured is None
     assert source.enabled.measured is None
-    assert source.ovp_limit.measured is None
-    assert source.ocp_limit.measured is None
 
 
 def test_source_refresh_updates_present_fields():
@@ -380,6 +378,15 @@ def test_source_refresh_updates_present_fields():
     driver.status_telemetry = Measurement(
         channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1]
     )
+    source.refresh()
+    assert source.voltage.measured == 48.2
+    assert source.current.measured == 9.5
+    assert source.enabled.measured is True
+
+
+def test_source_refresh_leaves_protection_limits_out_of_the_poll_loop():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
     driver.ovp_telemetry = Measurement(
         channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
     )
@@ -387,9 +394,34 @@ def test_source_refresh_updates_present_fields():
         channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
     )
     source.refresh()
-    assert source.voltage.measured == 48.2
-    assert source.current.measured == 9.5
-    assert source.enabled.measured is True
+    assert source.ovp_limit.measured is None
+    assert source.ocp_limit.measured is None
+
+
+def test_source_refresh_protection_limits_reads_back_the_thresholds():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
+    driver.ovp_telemetry = Measurement(
+        channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
+    )
+    driver.ocp_telemetry = Measurement(
+        channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
+    )
+    source.refresh_protection_limits()
+    assert source.ovp_limit.measured == 60.0
+    assert source.ocp_limit.measured == 25.0
+
+
+def test_source_command_confirms_the_protection_limits_landed():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
+    driver.ovp_telemetry = Measurement(
+        channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
+    )
+    driver.ocp_telemetry = Measurement(
+        channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
+    )
+    source.command()
     assert source.ovp_limit.measured == 60.0
     assert source.ocp_limit.measured == 25.0
 
@@ -433,6 +465,7 @@ class _FakeELoadDriver:
         self.output_enable_calls = []
         self.voltage_telemetry: Measurement | None = None
         self.current_telemetry: Measurement | None = None
+        self.read_count = 0
         self.daemon_functions = []
 
     def add_background_daemon_function(self, func) -> None:
@@ -462,9 +495,11 @@ class _FakeELoadDriver:
         self.output_enable_calls.append((enable, channel))
 
     def get_voltage(self, channel: int) -> Measurement | None:
+        self.read_count += 1
         return self.voltage_telemetry
 
     def get_current(self, channel: int) -> Measurement | None:
+        self.read_count += 1
         return self.current_telemetry
 
 
@@ -492,13 +527,17 @@ def test_sink_init_builds_channels_from_config():
     assert sink.enabled.setpoint is False
 
 
-def test_sink_open_opens_fixes_mode_and_starts_the_driver():
+def test_sink_open_opens_and_fixes_mode_without_starting_a_second_poller():
     driver = _FakeELoadDriver()
     sink = _make_sink(driver)
     sink.open()
     assert driver.opened is True
     assert driver.set_mode_calls == [(LoadMode.CV, 1)]
-    assert driver.started is True
+    # The sink shares one socket and one meter with the source, whose daemon reads
+    # the box for both quadrants. A second polling thread would only double the
+    # SCPI load and contend for the same transport lock.
+    assert driver.started is False
+    assert driver.daemon_functions == []
 
 
 def test_sink_close_stops_and_closes_the_driver():
@@ -538,6 +577,26 @@ def test_sink_refresh_updates_present_fields():
         channel_data={"sink.ch1.current": [11.0]}, timestamps=[1]
     )
     sink.refresh()
+    assert sink.voltage.measured == 47.9
+    assert sink.current.measured == 11.0
+
+
+def test_sink_adopt_terminal_shares_voltage_and_flips_current_sign():
+    driver = _FakeELoadDriver()
+    sink = _make_sink(driver)
+    sink.adopt_terminal(47.9, -11.0)
+    assert sink.voltage.measured == 47.9
+    # The source quadrant reads source-positive, so regeneration into the box is
+    # negative there and positive here.
+    assert sink.current.measured == 11.0
+
+
+def test_sink_adopt_terminal_ignores_absent_readings():
+    driver = _FakeELoadDriver()
+    sink = _make_sink(driver)
+    sink.voltage.measured = 47.9
+    sink.current.measured = 11.0
+    sink.adopt_terminal(None, None)
     assert sink.voltage.measured == 47.9
     assert sink.current.measured == 11.0
 
@@ -701,6 +760,30 @@ def test_run_commands_every_motor_and_transitions_to_running():
         assert controller.set_current_calls == [
             pytest.approx(1.0 / motor._effective_kt)
         ]
+
+
+def test_psb_telemetry_is_polled_only_by_the_source_daemon():
+    stand, _, _, _, psu, eload = _full_stand()
+    # One box behind one socket: the source's daemon polls it, then fans the reading
+    # out to the sink. The sink registers nothing of its own.
+    assert stand._refresh_sink_from_source in psu.daemon_functions
+    assert eload.daemon_functions == []
+
+
+def test_psb_telemetry_fan_out_gives_the_sink_the_sources_reading():
+    stand, _, _, _, psu, eload = _full_stand()
+    psu.voltage_telemetry = Measurement(
+        channel_data={"source.ch1.voltage": [48.2]}, timestamps=[1]
+    )
+    psu.current_telemetry = Measurement(
+        channel_data={"source.ch1.current": [-9.5]}, timestamps=[1]
+    )
+    stand.source.refresh()
+    stand._refresh_sink_from_source()
+    assert stand.sink.voltage.measured == 48.2
+    assert stand.sink.current.measured == 9.5
+    # The fan-out must not re-query the box for values the source already read.
+    assert eload.read_count == 0
 
 
 def test_command_interlock_blocks_transmission_while_armed():

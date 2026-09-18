@@ -17,14 +17,16 @@ from e_axle.stand import EAxleStand
 from e_axle.stand_config import EAxleStandConfig
 
 NETWORK_ADDRESS = "TCPIP0::192.168.0.3::5025::SOCKET"
-BACKGROUND_INTERVAL_S = 0.06  # VESC6 recommends >=10 Hz; its firmware times out a motor after 0.5s of silence
+MOTOR_INTERVAL_S = 0.06  # VESC6 recommends >=10 Hz; its firmware times out a motor after 0.5s of silence
+PSB_INTERVAL_S = 0.5  # The PSB's SCPI interface cannot service the motor rate, and needs no resend to hold its setpoints
 
 
 def build_stand(
     config: EAxleStandConfig | None = None,
     *,
     network_address: str = NETWORK_ADDRESS,
-    background_interval_s: float = BACKGROUND_INTERVAL_S,
+    motor_interval_s: float = MOTOR_INTERVAL_S,
+    psb_interval_s: float = PSB_INTERVAL_S,
 ) -> EAxleStand:
     """Build an EAxleStand against the real hardware, defaulting to the shipped config."""
     if config is None:
@@ -48,14 +50,10 @@ def build_stand(
     source_driver = InstroPSU("source", driver=psb.source, num_channels=1)
     sink_driver = InstroELoad("sink", driver=psb.sink)
 
-    devices = (
-        dut_controller,
-        left_load_controller,
-        right_load_controller,
-        source_driver,
-        sink_driver,
-    )
-    for device in devices:
-        device.background_interval = background_interval_s
+    motors = (dut_controller, left_load_controller, right_load_controller)
+    for motor in motors:
+        motor.background_interval = motor_interval_s
+    for supply in (source_driver, sink_driver):
+        supply.background_interval = psb_interval_s
 
-    return EAxleStand.from_drivers(config, *devices)
+    return EAxleStand.from_drivers(config, *motors, source_driver, sink_driver)
