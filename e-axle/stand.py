@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 import logging
 import threading
 from functools import partial
@@ -16,12 +16,18 @@ from stand_config import DutControllerConfig, EAxleStandConfig, LoadControllerCo
 
 logger = logging.getLogger(__name__)
 
+
 class Component(ABC):
     name: str
 
     def __init__(self, name: str) -> None:
         """Give this component a name prefix for its channels."""
         self.name = name
+
+    @abstractmethod
+    def command(self) -> None:
+        """Send this component's setpoints to its driver."""
+        ...
 
     def get_telemetry(self) -> dict[str, Any]:
         """Return a dict of all channels' measured values, keyed by their full name."""
@@ -30,7 +36,16 @@ class Component(ABC):
             for attr, channel in vars(self).items()
             if isinstance(channel, Measurable)
         }
-    
+
+    def tripped_channels(self) -> list[tuple[str, Monitorable[Any]]]:
+        """Every channel on this component currently outside its safe range, named with this component's prefix."""
+        return [
+            (f"{self.name}.{attr}", channel)
+            for attr, channel in vars(self).items()
+            if isinstance(channel, Monitorable) and channel.tripped
+        ]
+
+
 class Motor(Component):
     """One motor controller's channels and control logic: torque, speed, current, active mode, and temperature."""
 
@@ -98,14 +113,6 @@ class Motor(Component):
         """The channel currently being commanded, per this motor's control mode."""
         return {"torque": self.torque, "speed": self.speed, "current": self.current}[self.control_mode.setpoint]
 
-    def tripped_channels(self) -> list[tuple[str, Monitorable[Any]]]:
-        """Every channel on this motor currently outside its safe range, named with this motor's prefix."""
-        return [
-            (f"{self.name}.{attr}", channel)
-            for attr, channel in vars(self).items()
-            if isinstance(channel, Monitorable) and channel.tripped
-        ]
-
 
 class Source(Component):
     """The bidirectional supply's source quadrant: voltage, current, enable, and protection limits."""
@@ -131,6 +138,7 @@ class Source(Component):
         # command() ever runs, would otherwise fire a spurious trip).
         self.ovp_limit = Controllable(default=config.ovp_limit.default)
         self.ocp_limit = Controllable(default=config.ocp_limit.default)
+        driver.add_background_daemon_function(self.command)
         driver.add_background_daemon_function(self.refresh)
 
     def open(self) -> None:
@@ -175,14 +183,6 @@ class Source(Component):
         self.driver.set_overvoltage_protection_level(self.ovp_limit.setpoint, channel=self._channel)
         self.driver.set_overcurrent_protection_level(self.ocp_limit.setpoint, channel=self._channel)
 
-    def tripped_channels(self) -> list[tuple[str, Monitorable[Any]]]:
-        """Every channel on this source currently outside its safe range, named with this source's prefix."""
-        return [
-            (f"{self.name}.{attr}", channel)
-            for attr, channel in vars(self).items()
-            if isinstance(channel, Monitorable) and channel.tripped
-        ]
-
 
 class Sink(Component):
     """The bidirectional supply's sink quadrant: voltage (CV setpoint), current (limit), and enable."""
@@ -200,10 +200,11 @@ class Sink(Component):
         self.voltage = ControllableNumeric(default=config.voltage.default, minimum=config.voltage.minimum, maximum=config.voltage.maximum)
         self.current = ControllableNumeric(default=config.current.default, minimum=config.current.minimum, maximum=config.current.maximum)
         self.enabled = Controllable(default=config.enabled.default)
+        driver.add_background_daemon_function(self.command)
         driver.add_background_daemon_function(self.refresh)
 
     def open(self) -> None:
-        """Open the load's connection, fix it in CV mode, and start its default telemetry-only background daemon."""
+        """Open the load's connection, fix it in CV mode, and start its background daemon."""
         self.driver.open()
         self.driver.set_mode(LoadMode.CV, channel=self._channel)
         self.driver.start()
@@ -229,14 +230,6 @@ class Sink(Component):
         """Send this sink's setpoints to the load."""
         self.driver.set_level(self.voltage.setpoint, channel=self._channel, curr_limit=self.current.setpoint)
         self.driver.output_enable(self.enabled.setpoint, channel=self._channel)
-
-    def tripped_channels(self) -> list[tuple[str, Monitorable[Any]]]:
-        """Every channel on this sink currently outside its safe range, named with this sink's prefix."""
-        return [
-            (f"{self.name}.{attr}", channel)
-            for attr, channel in vars(self).items()
-            if isinstance(channel, Monitorable) and channel.tripped
-        ]
 
 
 class EAxleStandState(Enum):
@@ -318,6 +311,10 @@ class EAxleStand:
         self.source.current.setpoint = self.source.current.maximum
         self.source.enabled.setpoint = True
         self.source.command()
+        self.sink.voltage.setpoint = self.sink.voltage.default
+        self.sink.current.setpoint = self.sink.current.maximum
+        self.sink.enabled.setpoint = True
+        self.sink.command()
         for instrument in (self.dut, self.left_load, self.right_load):
             instrument.open()
         booted = self._wait_for_measurement(
@@ -431,7 +428,9 @@ class EAxleStand:
 
     def _on_trip(self, name: str, channel: Monitorable[Any]) -> None:
         """React to channel becoming tripped, appropriately for the current state."""
-        logger.warning("%s tripped: %r", name, channel)
+        logger.warning(
+            "%s tripped: measured=%s outside [%s, %s]", name, channel.measured, channel.minimum, channel.maximum
+        )
         if self.state in (EAxleStandState.ARMED, EAxleStandState.ARMING):
             with self._trip_lock:
                 if self.state not in (EAxleStandState.TRIP_STOPPING, EAxleStandState.TRIPPED):
