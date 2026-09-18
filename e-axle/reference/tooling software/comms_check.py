@@ -24,11 +24,11 @@ power supply's own reading as truth for real power accounting; these numbers are
 for control and protection.
 
 Usage:
-    python comms_check.py                          # gs_usb (candlelight), default
-    python comms_check.py --raw                    # dump raw frames instead
-    python comms_check.py --tau 0.8                # slower/faster display filter
-    python comms_check.py --interface slcan --channel COM5   # if reflashed
-    python comms_check.py --listen-only            # disable TX entirely
+    uv run comms_check.py                          # gs_usb (candlelight), default
+    uv run comms_check.py --raw                    # dump raw frames instead
+    uv run comms_check.py --tau 0.8                # slower/faster display filter
+    uv run comms_check.py --interface slcan --channel COM5   # if reflashed
+    uv run comms_check.py --listen-only            # disable TX entirely
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -42,50 +42,21 @@ import time
 from dataclasses import dataclass, field
 
 import can
+from blessed import Terminal
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-try:
-    import msvcrt  # Windows only
-    _PLATFORM = "windows"
-except ImportError:
-    import select
-    import termios
-    import tty
-    _PLATFORM = "posix"
+from e_axle.constants import NODES
 
+TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
-_posix_saved_settings = None
-
-
-def enable_raw_mode() -> None:
-    """Put stdin into cbreak mode so single keys are readable without Enter. No-op on Windows."""
-    global _posix_saved_settings
-    if _PLATFORM != "posix" or not HAVE_KEYBOARD:
-        return
-    _posix_saved_settings = termios.tcgetattr(sys.stdin.fileno())
-    tty.setcbreak(sys.stdin.fileno())
-
-
-def restore_terminal() -> None:
-    """Restore stdin's settings saved by enable_raw_mode(). No-op on Windows or if never enabled."""
-    if _PLATFORM != "posix" or _posix_saved_settings is None:
-        return
-    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _posix_saved_settings)
 
 # --------------------------------------------------------------------------
 # Stand configuration
 # --------------------------------------------------------------------------
-
-# vesc_id -> (display name, pole pairs, gear ratio from motor to output shaft)
-NODES: dict[int, tuple[str, int, float]] = {
-    0: ("DUT", 3, 9.5),      # E-Axle traction motor, 6 poles, 9.5:1 final drive
-    1: ("DMC-L", 7, 1.0),    # Dyno left,  MP 8055, 14 poles, direct to half shaft
-    2: ("DMC-R", 7, 1.0),    # Dyno right, MP 8055, 14 poles, direct to half shaft
-}
 
 STALE_AFTER_S = 0.5    # node flagged STALE if silent this long
 STOP_TX_HZ = 50.0      # rate at which zero commands are repeated while latched
@@ -147,24 +118,12 @@ def poll_key() -> str | None:
     """Non-blocking single-key read. Returns None if nothing is waiting."""
     if not HAVE_KEYBOARD:
         return None
-    if _PLATFORM == "windows":
-        if not msvcrt.kbhit():
-            return None
-        ch = msvcrt.getch()
-        if ch in (b"\x00", b"\xe0"):   # arrow / function keys send a second byte
-            msvcrt.getch()
-            return None
-        return ch.decode("utf-8", "ignore").lower()
-
-    if not select.select([sys.stdin], [], [], 0)[0]:
+    key = TERM.inkey(timeout=0)
+    if not key:
         return None
-    ch = sys.stdin.read(1)
-    if ch == "\x1b":   # ESC prefixes an ANSI arrow-key escape sequence; drain and ignore it
-        if select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == "[":
-            if select.select([sys.stdin], [], [], 0)[0]:
-                sys.stdin.read(1)
+    if key.is_sequence:   # arrow / function keys are not used here
         return None
-    return ch.lower()
+    return str(key).lower()
 
 
 # --------------------------------------------------------------------------
@@ -566,10 +525,10 @@ def main() -> None:
           f"at {args.bitrate} bps ...")
 
     bus = None
-    enable_raw_mode()
     try:
-        bus = open_bus(args)
-        run_raw(bus) if args.raw else run_live(bus, args.listen_only)
+        with TERM.cbreak():
+            bus = open_bus(args)
+            run_raw(bus) if args.raw else run_live(bus, args.listen_only)
     except KeyboardInterrupt:
         pass
     except Exception as e:  # noqa: BLE001
@@ -578,7 +537,6 @@ def main() -> None:
               "bound via Zadig; libusb-1.0.dll present; nothing else holding "
               "the device; CANH, CANL and GND all connected.")
     finally:
-        restore_terminal()
         if bus is not None:
             # Always leave the stand with zero torque commanded, whatever
             # path we took out of the loop.
