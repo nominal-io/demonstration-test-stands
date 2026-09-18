@@ -11,11 +11,11 @@ def test_nominal_config_initializes_every_stand_channel():
 
     # DUT Controller - verify all three channel types
     dut_torque = ControllableNumeric(**config.dut_controller.torque.__dict__)
-    dut_speed = ControllableNumeric(**config.dut_controller.speed.__dict__)
+    dut_velocity = ControllableNumeric(**config.dut_controller.velocity.__dict__)
     dut_current = ControllableNumeric(**config.dut_controller.current.__dict__)
 
-    assert dut_speed.maximum == 3_000.0
-    assert dut_speed.minimum == -3_000.0
+    assert dut_velocity.maximum == 3_000.0
+    assert dut_velocity.minimum == -3_000.0
     assert dut_current.maximum == 35.0
     assert dut_current.minimum == -35.0
     assert round(dut_torque.maximum, 3) == 27.503
@@ -27,15 +27,15 @@ def test_nominal_config_initializes_every_stand_channel():
     left_load_torque = ControllableNumeric(
         **config.left_load_controller.torque.__dict__
     )
-    left_load_speed = ControllableNumeric(**config.left_load_controller.speed.__dict__)
+    left_load_velocity = ControllableNumeric(**config.left_load_controller.velocity.__dict__)
     left_load_current = ControllableNumeric(
         **config.left_load_controller.current.__dict__
     )
 
     assert left_load_current.maximum == 20.0
     assert round(left_load_torque.maximum, 3) == 3.812
-    assert left_load_speed.maximum == 471.429
-    assert left_load_speed.minimum == -471.429
+    assert left_load_velocity.maximum == 471.429
+    assert left_load_velocity.minimum == -471.429
     left_load_temperature = Monitorable(
         **config.left_load_controller.temperature.__dict__
     )
@@ -46,8 +46,8 @@ def test_nominal_config_initializes_every_stand_channel():
     right_load_torque = ControllableNumeric(
         **config.right_load_controller.torque.__dict__
     )
-    right_load_speed = ControllableNumeric(
-        **config.right_load_controller.speed.__dict__
+    right_load_velocity = ControllableNumeric(
+        **config.right_load_controller.velocity.__dict__
     )
     right_load_current = ControllableNumeric(
         **config.right_load_controller.current.__dict__
@@ -55,8 +55,8 @@ def test_nominal_config_initializes_every_stand_channel():
 
     assert right_load_current.maximum == 20.0
     assert round(right_load_torque.maximum, 3) == 3.80
-    assert right_load_speed.maximum == 471.429
-    assert right_load_speed.minimum == -471.429
+    assert right_load_velocity.maximum == 471.429
+    assert right_load_velocity.minimum == -471.429
     right_load_temperature = Monitorable(
         **config.right_load_controller.temperature.__dict__
     )

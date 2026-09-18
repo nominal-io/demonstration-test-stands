@@ -33,7 +33,7 @@ class MonitorableConfig:
 @dataclass(frozen=True)
 class DutControllerConfig:
     torque: ControllableNumericConfig
-    speed: ControllableNumericConfig
+    velocity: ControllableNumericConfig
     current: ControllableNumericConfig
     temperature: MonitorableConfig
 
@@ -41,7 +41,7 @@ class DutControllerConfig:
 @dataclass(frozen=True)
 class LoadControllerConfig:
     torque: ControllableNumericConfig
-    speed: ControllableNumericConfig
+    velocity: ControllableNumericConfig
     current: ControllableNumericConfig
     temperature: MonitorableConfig
 
@@ -126,13 +126,13 @@ class EAxleStandConfig:
             boot_timeout_s=data["boot_timeout_s"],
             dut_controller=DutControllerConfig(
                 torque=_numeric_from_dict(data["dut_controller"]["torque"]),
-                speed=_numeric_from_dict(data["dut_controller"]["speed"]),
+                velocity=_numeric_from_dict(data["dut_controller"]["velocity"]),
                 current=_numeric_from_dict(data["dut_controller"]["current"]),
                 temperature=_bounded_from_dict(data["dut_controller"]["temperature"]),
             ),
             left_load_controller=LoadControllerConfig(
                 torque=_numeric_from_dict(data["left_load_controller"]["torque"]),
-                speed=_numeric_from_dict(data["left_load_controller"]["speed"]),
+                velocity=_numeric_from_dict(data["left_load_controller"]["velocity"]),
                 current=_numeric_from_dict(data["left_load_controller"]["current"]),
                 temperature=_bounded_from_dict(
                     data["left_load_controller"]["temperature"]
@@ -140,7 +140,7 @@ class EAxleStandConfig:
             ),
             right_load_controller=LoadControllerConfig(
                 torque=_numeric_from_dict(data["right_load_controller"]["torque"]),
-                speed=_numeric_from_dict(data["right_load_controller"]["speed"]),
+                velocity=_numeric_from_dict(data["right_load_controller"]["velocity"]),
                 current=_numeric_from_dict(data["right_load_controller"]["current"]),
                 temperature=_bounded_from_dict(
                     data["right_load_controller"]["temperature"]
@@ -171,19 +171,19 @@ class EAxleStandConfig:
             "boot_timeout_s": self.boot_timeout_s,
             "dut_controller": {
                 "torque": _numeric_to_dict(self.dut_controller.torque),
-                "speed": _numeric_to_dict(self.dut_controller.speed),
+                "velocity": _numeric_to_dict(self.dut_controller.velocity),
                 "current": _numeric_to_dict(self.dut_controller.current),
                 "temperature": _bounded_to_dict(self.dut_controller.temperature),
             },
             "left_load_controller": {
                 "torque": _numeric_to_dict(self.left_load_controller.torque),
-                "speed": _numeric_to_dict(self.left_load_controller.speed),
+                "velocity": _numeric_to_dict(self.left_load_controller.velocity),
                 "current": _numeric_to_dict(self.left_load_controller.current),
                 "temperature": _bounded_to_dict(self.left_load_controller.temperature),
             },
             "right_load_controller": {
                 "torque": _numeric_to_dict(self.right_load_controller.torque),
-                "speed": _numeric_to_dict(self.right_load_controller.speed),
+                "velocity": _numeric_to_dict(self.right_load_controller.velocity),
                 "current": _numeric_to_dict(self.right_load_controller.current),
                 "temperature": _bounded_to_dict(self.right_load_controller.temperature),
             },

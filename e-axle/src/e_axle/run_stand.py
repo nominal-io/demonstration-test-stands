@@ -43,11 +43,11 @@ def _drain_error_queue(visa_resource: VisaConfig | str) -> None:
 def main() -> None:
     with build_stand() as stand:
         # __enter__ already called open() (== arm()), landing in ARMED.
-        stand.dut.control_mode.setpoint = "speed"
+        stand.dut.control_mode.setpoint = "velocity"
         stand.dut.velocity.setpoint = 1000.0  # mechanical RPM
         stand.right_load.control_mode.setpoint = "torque"
         stand.left_load.control_mode.setpoint = "torque"
-        logger.info(f"Entering run state. speed setpoint: {stand.dut.velocity.setpoint}")
+        logger.info(f"Entering run state. velocity setpoint: {stand.dut.velocity.setpoint}")
         stand.run()
         sleep(5)
         for torque in _sweep(
@@ -59,7 +59,7 @@ def main() -> None:
             stand.right_load.torque.setpoint = -torque
             sleep(STEP_HOLD_S)
             logger.info(
-                f"dut speed: setpoint={stand.dut.velocity.setpoint:.1f} measured={stand.dut.velocity.measured}"
+                f"dut velocity: setpoint={stand.dut.velocity.setpoint:.1f} measured={stand.dut.velocity.measured}"
             )
             if stand.state == EAxleStandState.TRIPPED:
                 logger.error("Stand tripped, aborting sweep")

@@ -23,10 +23,9 @@ STATE_STREAM_ID = "stand_state"
 
 # UI input prefix -> EAxleStand attribute
 MOTORS = {"dut": "dut", "left": "left_load", "right": "right_load"}
-# UI input id suffix -> Motor channel; the UI calls the speed channel "velocity"
-CONTROL_MODES: dict[str, Literal["torque", "speed", "current"]] = {
+CONTROL_MODES: dict[str, Literal["torque", "velocity", "current"]] = {
     "torque": "torque",
-    "velocity": "speed",
+    "velocity": "velocity",
     "current": "current",
 }
 
@@ -34,7 +33,7 @@ CONTROL_MODES: dict[str, Literal["torque", "speed", "current"]] = {
 def apply_motor_inputs(
     client: connect_python.Client, motor: Motor, prefix: str
 ) -> None:
-    """Mirror one motor's UI inputs onto its control mode and speed/torque/current setpoints."""
+    """Mirror one motor's UI inputs onto its control mode and velocity/torque/current setpoints."""
     requested_mode = str(
         client.get_value(f"{prefix}-mode", motor.control_mode.setpoint)
     ).lower()

@@ -28,7 +28,7 @@ streaming:
   - channel: demo.pitch
   - channel: demo.pump_flow_rate
   - channel: demo.roll
-  - channel: demo.speed
+  - channel: demo.velocity
   - channel: stand_state.state
 python:
   packages:
@@ -94,7 +94,7 @@ tiles:
                 channel: left.current
               - label: Velocity
                 color: safe
-                channel: left.speed
+                channel: left.velocity
               cols: 3
               row_gap: null
               col_gap: null
@@ -146,7 +146,7 @@ tiles:
                 channel: right.current
               - label: Velocity
                 color: safe
-                channel: right.speed
+                channel: right.velocity
               cols: 3
               row_gap: null
               col_gap: null
@@ -200,7 +200,7 @@ tiles:
                 channel: dut.current
               - label: Velocity
                 color: safe
-                channel: dut.speed
+                channel: dut.velocity
               cols: 3
               row_gap: null
               col_gap: null

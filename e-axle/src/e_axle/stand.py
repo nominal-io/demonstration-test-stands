@@ -54,13 +54,13 @@ class Component(ABC):
 
 
 class Motor(Component):
-    """One motor controller's channels and control logic: torque, speed, current, active mode, and temperature."""
+    """One motor controller's channels and control logic: torque, velocity, current, active mode, and temperature."""
 
     controller: InstroMotorController
     torque: ControllableNumeric
     velocity: ControllableNumeric
     current: ControllableNumeric
-    control_mode: Controllable[Literal["torque", "speed", "current"]]
+    control_mode: Controllable[Literal["torque", "velocity", "current"]]
     temperature: Monitorable[float]
 
     def __init__(
@@ -79,9 +79,9 @@ class Motor(Component):
             maximum=config.torque.maximum,
         )
         self.velocity = ControllableNumeric(
-            default=config.speed.default,
-            minimum=config.speed.minimum,
-            maximum=config.speed.maximum,
+            default=config.velocity.default,
+            minimum=config.velocity.minimum,
+            maximum=config.velocity.maximum,
         )
         self.current = ControllableNumeric(
             default=config.current.default,
@@ -129,7 +129,7 @@ class Motor(Component):
         mode = self.control_mode.setpoint
         if mode == "torque":
             self.controller.set_current(self.torque.setpoint / self._effective_kt)
-        elif mode == "speed":
+        elif mode == "velocity":
             self.controller.set_velocity(self.velocity.setpoint)
         elif mode == "current":
             self.controller.set_current(self.current.setpoint)
@@ -137,7 +137,7 @@ class Motor(Component):
     @property
     def active_channel(self) -> ControllableNumeric:
         """The channel currently being commanded, per this motor's control mode."""
-        return {"torque": self.torque, "speed": self.velocity, "current": self.current}[
+        return {"torque": self.torque, "velocity": self.velocity, "current": self.current}[
             self.control_mode.setpoint
         ]
 

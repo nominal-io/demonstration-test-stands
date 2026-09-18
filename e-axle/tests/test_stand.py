@@ -81,7 +81,7 @@ class _FakeController:
 def _dut_config() -> DutControllerConfig:
     return DutControllerConfig(
         torque=ControllableNumericConfig(default=0.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=0.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -139,11 +139,11 @@ def test_motor_command_torque_mode_converts_to_current():
     assert controller.set_current_calls == [pytest.approx(10.0 / motor._effective_kt)]
 
 
-def test_motor_command_speed_mode_sends_velocity():
+def test_motor_command_velocity_mode_sends_velocity():
     controller = _FakeController()
     motor = _make_motor(controller)
     motor.velocity.setpoint = 500.0
-    motor.control_mode.setpoint = "speed"
+    motor.control_mode.setpoint = "velocity"
     motor.command()
     assert controller.set_velocity_calls == [500.0]
 
@@ -886,7 +886,7 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -935,7 +935,7 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand._trip_stop_timeout_s = 0.05
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -1119,7 +1119,7 @@ def test_close_from_already_tripped_does_not_re_trip_but_still_disconnects():
 def _load_config() -> LoadControllerConfig:
     return LoadControllerConfig(
         torque=ControllableNumericConfig(default=0.0, minimum=-3.8, maximum=3.8),
-        speed=ControllableNumericConfig(default=0.0, minimum=-471.0, maximum=471.0),
+        velocity=ControllableNumericConfig(default=0.0, minimum=-471.0, maximum=471.0),
         current=ControllableNumericConfig(default=0.0, minimum=-20.0, maximum=20.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
