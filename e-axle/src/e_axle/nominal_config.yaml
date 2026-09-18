@@ -1,0 +1,88 @@
+disarm_timeout_s: 3.0  # max time to wait for the source to confirm output disabled
+arm_timeout_s: 5.0  # PLACEHOLDER -- max time to wait for source power-on and motor telemetry to confirm; unconfirmed against real boot time
+stop_timeout_s: 10.0  # PLACEHOLDER -- max time to wait for the ramp-to-idle to complete; unconfirmed against real deceleration time
+trip_stop_timeout_s: 2.0  # PLACEHOLDER -- best-effort window for the emergency shutdown to confirm; TRIPPED is reached either way
+boot_timeout_s: 10.0  # PLACEHOLDER -- max time to wait for source output to come on line and motor controllers to boot on open(); unconfirmed against real boot time
+
+dut_controller:
+  speed:  # mechanical RPM -- VESC6.set_velocity converts to ERPM itself via pole_pairs
+    default: 0.0
+    minimum: -3000.0  # symmetric with current's +/-35 A; a nonneg floor trips on ordinary rest jitter
+    maximum: 3000.0  # 12000 ERPM command ceiling / 4 pole pairs
+  current:
+    default: 0.0
+    minimum: -35.0
+    maximum: 35.0  # manual section 7.1
+  torque:
+    default: 0.0
+    minimum: -27.503
+    maximum: 27.503  # derived: 35 A x Kt x gear ratio
+  temperature:  # motor winding, not FET -- manual section 15, "winding temperature, not the controllers, limits run duration"
+    minimum: 0.0  # a reading at/below 0 C is a sensor fault (no sensor fitted, or wiring fault), not a real cold reading
+    maximum: 100.0  # manual: "Motor temperature | > 100 C | Immediate"; matches old MAX_MOTOR_C
+
+left_load_controller:
+  speed:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
+    default: 0.0
+    minimum: -471.429  # 3300 ERPM overspeed trip / 7 pole pairs; no separate command ceiling exists
+    maximum: 471.429
+  current:
+    default: 0.0
+    minimum: -20.0
+    maximum: 20.0  # manual section 7.1; matches old max_brake_a
+  torque:
+    default: 0.0
+    minimum: -3.812
+    maximum: 3.812  # derived: 20 A x Kt 0.1906 (manual section 4.1, DMC-L)
+  temperature:  # motor winding, not FET -- manual section 15, "winding temperature, not the controllers, limits run duration"
+    minimum: 0.0  # a reading at/below 0 C is a sensor fault (no sensor fitted, or wiring fault), not a real cold reading
+    maximum: 100.0  # manual: "Motor temperature | > 100 C | Immediate"; matches old MAX_MOTOR_C
+
+right_load_controller:
+  speed:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
+    default: 0.0
+    minimum: -471.429  # 3300 ERPM overspeed trip / 7 pole pairs; no separate command ceiling exists
+    maximum: 471.429
+  current:
+    default: 0.0
+    minimum: -20.0
+    maximum: 20.0  # manual section 7.1; matches old max_brake_a
+  torque:
+    default: 0.0
+    minimum: -3.80
+    maximum: 3.80  # derived: 20 A x Kt 0.1900 (manual section 4.1, DMC-R)
+  temperature:  # motor winding, not FET -- manual section 15, "winding temperature, not the controllers, limits run duration"
+    minimum: 0.0  # a reading at/below 0 C is a sensor fault (no sensor fitted, or wiring fault), not a real cold reading
+    maximum: 100.0  # manual: "Motor temperature | > 100 C | Immediate"; matches old MAX_MOTOR_C
+
+source:
+  psu_channel_number: 1  # old PSU_CHANNEL; PSB is single-channel
+  voltage:
+    default: 48.0  # manual section 3.2/14, "48 V bus setpoint"
+    minimum: 0.0
+    maximum: 54.0  # old bus_overvoltage_v; not re-confirmed in the manual
+  current:
+    default: 20.0
+    minimum: -20.0
+    maximum: 20.0  # old SOURCE_CURRENT_LIMIT_A; manual only says "confirm source limit," no number given
+  enabled: false
+  ovp_limit:  # hardware OVP threshold on the PSU itself -- manual: "OVP set so the software interlock trips first"
+    default: 60.0  # confirmed value; 6 V above voltage.maximum so software trips before hardware does
+    minimum: 54.0  # must stay above voltage.maximum, or the hardware would trip before software does
+    maximum: 65.0  # PLACEHOLDER -- no real device ceiling confirmed, just a permissive bound around the default
+  ocp_limit:  # hardware OCP threshold on the PSU itself -- same "software trips first" relationship as ovp_limit
+    default: 25.0  # PLACEHOLDER -- no sourced value; 25% margin above current.maximum, unconfirmed
+    minimum: 20.0  # must stay above current.maximum, or the hardware would trip before software does
+    maximum: 30.0  # PLACEHOLDER -- no real device ceiling confirmed, just a permissive bound around the default
+
+sink:
+  psu_channel_number: 1  # same physical unit as source
+  voltage:  # CV setpoint for the shared bus, same target as source.voltage -- see stand.py's Sink for why
+    default: 48.0  # matches source.voltage.default -- same shared bus
+    minimum: 0.0
+    maximum: 54.0  # same bus OVP as source
+  current:
+    default: 20.0
+    minimum: -20.0
+    maximum: 20.0  # old psu_sink_current_limit_a: "1.66x the 24.1 A worst-case steady-state regen, 0.67x the PSB's 60 A sink"
+  enabled: false

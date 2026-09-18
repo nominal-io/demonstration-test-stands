@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 import yaml
 
@@ -8,17 +8,20 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ControllableConfig(Generic[T]):
+class ControllableConfig[T]:
     default: T
+
 
 @dataclass(frozen=True)
 class ControllableNumericConfig(ControllableConfig[float]):
     minimum: float
     maximum: float
 
+
 @dataclass(frozen=True)
 class MonitorableConfig:
     """Safe range for a monitor-only channel -- no default, since nothing is commanded."""
+
     minimum: float
     maximum: float
 
@@ -58,11 +61,17 @@ class SinkConfig:
 
 
 def _numeric_from_dict(data: dict) -> ControllableNumericConfig:
-    return ControllableNumericConfig(default=data["default"], minimum=data["minimum"], maximum=data["maximum"])
+    return ControllableNumericConfig(
+        default=data["default"], minimum=data["minimum"], maximum=data["maximum"]
+    )
 
 
 def _numeric_to_dict(channel: ControllableNumericConfig) -> dict:
-    return {"default": channel.default, "minimum": channel.minimum, "maximum": channel.maximum}
+    return {
+        "default": channel.default,
+        "minimum": channel.minimum,
+        "maximum": channel.maximum,
+    }
 
 
 def _bounded_from_dict(data: dict) -> MonitorableConfig:
@@ -107,13 +116,17 @@ class EAxleStandConfig:
                 torque=_numeric_from_dict(data["left_load_controller"]["torque"]),
                 speed=_numeric_from_dict(data["left_load_controller"]["speed"]),
                 current=_numeric_from_dict(data["left_load_controller"]["current"]),
-                temperature=_bounded_from_dict(data["left_load_controller"]["temperature"]),
+                temperature=_bounded_from_dict(
+                    data["left_load_controller"]["temperature"]
+                ),
             ),
             right_load_controller=LoadControllerConfig(
                 torque=_numeric_from_dict(data["right_load_controller"]["torque"]),
                 speed=_numeric_from_dict(data["right_load_controller"]["speed"]),
                 current=_numeric_from_dict(data["right_load_controller"]["current"]),
-                temperature=_bounded_from_dict(data["right_load_controller"]["temperature"]),
+                temperature=_bounded_from_dict(
+                    data["right_load_controller"]["temperature"]
+                ),
             ),
             source=SourceConfig(
                 psu_channel_number=data["source"]["psu_channel_number"],

@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from math import inf
 from time import monotonic
-from typing import Callable, ClassVar, Generic, Protocol, TypeVar
-
+from typing import ClassVar, Protocol, TypeVar
 
 T = TypeVar("T")
 
@@ -15,7 +15,7 @@ class Comparable(Protocol):
 TOrdered = TypeVar("TOrdered", bound=Comparable)
 
 
-class Measurable(Generic[T]):
+class Measurable[T]:
     """A quantity whose actual measured value is tracked."""
 
     _monotonic_origin: ClassVar[float]
@@ -49,11 +49,14 @@ class Measurable(Generic[T]):
         """Convert this channel's timestamp into an ISO 8601 wall-clock string, for display (e.g. logs)."""
         if self._timestamp is None:
             return None
-        return (self._wall_origin + timedelta(seconds=self._timestamp - self._monotonic_origin)).isoformat(timespec="seconds")
+        return (
+            self._wall_origin
+            + timedelta(seconds=self._timestamp - self._monotonic_origin)
+        ).isoformat(timespec="seconds")
 
 
 Measurable._monotonic_origin = monotonic()
-Measurable._wall_origin = datetime.now()
+Measurable._wall_origin = datetime.now(UTC)
 
 
 class Controllable(Measurable[T]):
@@ -109,7 +112,7 @@ class Monitorable(Measurable[TOrdered]):
             raise ValueError(f"minimum {minimum} is greater than maximum {maximum}")
         self._minimum = minimum
         self._maximum = maximum
-        self.on_trip: Callable[["Monitorable[TOrdered]"], None] | None = None
+        self.on_trip: Callable[[Monitorable[TOrdered]], None] | None = None
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.to_isoformat()}: minimum={self.minimum}, measured={self.measured}, maximum={self.maximum})"
@@ -140,17 +143,27 @@ class Monitorable(Measurable[TOrdered]):
     @property
     def tripped(self) -> bool:
         """Whether the measured value has left the safe range."""
-        return self.measured is not None and (self.measured < self._minimum or self.measured > self._maximum)
+        return self.measured is not None and (
+            self.measured < self._minimum or self.measured > self._maximum
+        )
 
 
 class ControllableNumeric(Controllable[float], Monitorable[float]):
     """A numeric channel that is both commandable, clamped to a range, and monitored for trips."""
 
-    def __init__(self, default: float, minimum: float = -inf, maximum: float = inf, deadband: float = 0.0) -> None:
+    def __init__(
+        self,
+        default: float,
+        minimum: float = -inf,
+        maximum: float = inf,
+        deadband: float = 0.0,
+    ) -> None:
         if minimum > maximum:
             raise ValueError(f"minimum {minimum} is greater than maximum {maximum}")
         if default < minimum or default > maximum:
-            raise ValueError(f"Default value {default} is outside of bounds [{minimum}, {maximum}]")
+            raise ValueError(
+                f"Default value {default} is outside of bounds [{minimum}, {maximum}]"
+            )
         if deadband < 0:
             raise ValueError(f"deadband {deadband} is negative")
         super().__init__(default=default, minimum=minimum, maximum=maximum)
@@ -172,4 +185,7 @@ class ControllableNumeric(Controllable[float], Monitorable[float]):
     @property
     def at_setpoint(self) -> bool:
         """Whether the measured value is within the deadband of the commanded setpoint."""
-        return self.measured is not None and abs(self.measured - self.setpoint) <= self._deadband
+        return (
+            self.measured is not None
+            and abs(self.measured - self.setpoint) <= self._deadband
+        )

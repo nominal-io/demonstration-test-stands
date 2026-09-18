@@ -1,4 +1,4 @@
-name: Run E-Axle Unit Tests
+name: E-Axle Checks
 
 on:
   push:
@@ -12,14 +12,18 @@ on:
 
 jobs:
   test:
-    name: Run E-Axle Unit Tests on Python ${{ matrix.python-version }}
+    name: E-Axle Checks on Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
     defaults:
       run:
         working-directory: e-axle
 
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.13', '3.14']
 
@@ -33,5 +37,17 @@ jobs:
         enable-cache: true
         cache-dependency-glob: e-axle/uv.lock
 
+    - name: Set up just
+      uses: extractions/setup-just@v3
+
     - name: Install dependencies
-      run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
+      run: uv sync --locked
+
+    - name: Lint, format, and type checks
+      run: |
+        just lint --output-format=github
+        just format --check --diff
+        just check
+
+    - name: Run tests with pytest
+      run: just test -v

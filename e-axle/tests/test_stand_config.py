@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from channels import Controllable, ControllableNumeric, Monitorable
-from stand_config import EAxleStandConfig
+from e_axle.channels import Controllable, ControllableNumeric, Monitorable
+from e_axle.stand_config import EAxleStandConfig
 
 _CONFIG_PATH = Path(__file__).parent.parent / "nominal_config.yaml"
 
@@ -28,28 +28,42 @@ def test_nominal_config_initializes_every_stand_channel():
     assert dut_temperature.maximum == 100.0
 
     # Left Load Controller - verify torque bound (asymmetric)
-    left_load_torque = ControllableNumeric(**config.left_load_controller.torque.__dict__)
+    left_load_torque = ControllableNumeric(
+        **config.left_load_controller.torque.__dict__
+    )
     left_load_speed = ControllableNumeric(**config.left_load_controller.speed.__dict__)
-    left_load_current = ControllableNumeric(**config.left_load_controller.current.__dict__)
+    left_load_current = ControllableNumeric(
+        **config.left_load_controller.current.__dict__
+    )
 
     assert left_load_current.maximum == 20.0
     assert round(left_load_torque.maximum, 3) == 3.812
     assert left_load_speed.maximum == 471.429
     assert left_load_speed.minimum == -471.429
-    left_load_temperature = Monitorable(**config.left_load_controller.temperature.__dict__)
+    left_load_temperature = Monitorable(
+        **config.left_load_controller.temperature.__dict__
+    )
     assert left_load_temperature.minimum == 0.0
     assert left_load_temperature.maximum == 100.0
 
     # Right Load Controller - verify torque bound (slightly different from left)
-    right_load_torque = ControllableNumeric(**config.right_load_controller.torque.__dict__)
-    right_load_speed = ControllableNumeric(**config.right_load_controller.speed.__dict__)
-    right_load_current = ControllableNumeric(**config.right_load_controller.current.__dict__)
+    right_load_torque = ControllableNumeric(
+        **config.right_load_controller.torque.__dict__
+    )
+    right_load_speed = ControllableNumeric(
+        **config.right_load_controller.speed.__dict__
+    )
+    right_load_current = ControllableNumeric(
+        **config.right_load_controller.current.__dict__
+    )
 
     assert right_load_current.maximum == 20.0
     assert round(right_load_torque.maximum, 3) == 3.80
     assert right_load_speed.maximum == 471.429
     assert right_load_speed.minimum == -471.429
-    right_load_temperature = Monitorable(**config.right_load_controller.temperature.__dict__)
+    right_load_temperature = Monitorable(
+        **config.right_load_controller.temperature.__dict__
+    )
     assert right_load_temperature.minimum == 0.0
     assert right_load_temperature.maximum == 100.0
 

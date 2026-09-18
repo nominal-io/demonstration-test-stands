@@ -3,14 +3,14 @@ from functools import partial
 from typing import Any, cast
 
 import pytest
-
-from channels import Controllable, Monitorable
 from instro.eload import InstroELoad, LoadMode
 from instro.lib import Measurement
 from instro.psu import InstroPSU
 from instro.unstable.motorcontroller import InstroMotorController
-from stand import EAxleStand, EAxleStandState, Motor, Sink, Source
-from stand_config import (
+
+from e_axle.channels import Controllable, Monitorable
+from e_axle.stand import EAxleStand, EAxleStandState, Motor, Sink, Source
+from e_axle.stand_config import (
     ControllableConfig,
     ControllableNumericConfig,
     DutControllerConfig,
@@ -27,7 +27,6 @@ def _bare_stand() -> EAxleStand:
 
 
 class _FakeSource:
-
     def __init__(self, confirms: bool) -> None:
         self.enabled = Controllable(default=True)
         self.enabled.measured = True
@@ -42,17 +41,7 @@ class _FakeSource:
             self.enabled.measured = self.enabled.setpoint
 
 
-class _FakeMotor:
-
-    def __init__(self) -> None:
-        self.commanded = False
-
-    def command(self) -> None:
-        self.commanded = True
-
-
 class _FakeController:
-
     def __init__(self, name: str = "dut") -> None:
         self.name = name
         self.daemon_functions = []
@@ -99,7 +88,11 @@ def _dut_config() -> DutControllerConfig:
 
 
 def _make_motor(controller: _FakeController) -> Motor:
-    return Motor(name="dut", controller=cast(InstroMotorController, controller), config=_dut_config())
+    return Motor(
+        name="dut",
+        controller=cast(InstroMotorController, controller),
+        config=_dut_config(),
+    )
 
 
 def test_motor_init_builds_channels_from_config():
@@ -221,7 +214,9 @@ def test_motor_refresh_updates_present_fields():
 def test_motor_refresh_ignores_missing_fields():
     controller = _FakeController()
     motor = _make_motor(controller)
-    controller.telemetry = Measurement(channel_data={"dut.velocity": [900.0]}, timestamps=[123])
+    controller.telemetry = Measurement(
+        channel_data={"dut.velocity": [900.0]}, timestamps=[123]
+    )
     motor.refresh()
     assert motor.speed.measured == 900.0
     assert motor.current.measured is None
@@ -236,7 +231,6 @@ def test_motor_tripped_channels_prefixes_with_motor_name():
 
 
 class _FakePSUDriver:
-
     def __init__(self, name: str = "source") -> None:
         self.name = name
         self.opened = False
@@ -313,7 +307,9 @@ def _source_config() -> SourceConfig:
 
 
 def _make_source(driver: _FakePSUDriver) -> Source:
-    return Source(name="source", driver=cast(InstroPSU, driver), config=_source_config())
+    return Source(
+        name="source", driver=cast(InstroPSU, driver), config=_source_config()
+    )
 
 
 def test_source_init_builds_channels_from_config():
@@ -375,11 +371,21 @@ def test_source_refresh_does_nothing_when_no_telemetry():
 def test_source_refresh_updates_present_fields():
     driver = _FakePSUDriver()
     source = _make_source(driver)
-    driver.voltage_telemetry = Measurement(channel_data={"source.ch1.voltage": [48.2]}, timestamps=[1])
-    driver.current_telemetry = Measurement(channel_data={"source.ch1.current": [9.5]}, timestamps=[1])
-    driver.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1])
-    driver.ovp_telemetry = Measurement(channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1])
-    driver.ocp_telemetry = Measurement(channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1])
+    driver.voltage_telemetry = Measurement(
+        channel_data={"source.ch1.voltage": [48.2]}, timestamps=[1]
+    )
+    driver.current_telemetry = Measurement(
+        channel_data={"source.ch1.current": [9.5]}, timestamps=[1]
+    )
+    driver.status_telemetry = Measurement(
+        channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1]
+    )
+    driver.ovp_telemetry = Measurement(
+        channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
+    )
+    driver.ocp_telemetry = Measurement(
+        channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
+    )
     source.refresh()
     assert source.voltage.measured == 48.2
     assert source.current.measured == 9.5
@@ -391,7 +397,9 @@ def test_source_refresh_updates_present_fields():
 def test_source_refresh_decodes_disabled_status_as_false():
     driver = _FakePSUDriver()
     source = _make_source(driver)
-    driver.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [0.0]}, timestamps=[1])
+    driver.status_telemetry = Measurement(
+        channel_data={"source.ch1.enabled": [0.0]}, timestamps=[1]
+    )
     source.refresh()
     assert source.enabled.measured is False
 
@@ -414,7 +422,6 @@ def test_source_ovp_and_ocp_are_commandable_not_monitorable():
 
 
 class _FakeELoadDriver:
-
     def __init__(self, name: str = "sink") -> None:
         self.name = name
         self.opened = False
@@ -446,7 +453,9 @@ class _FakeELoadDriver:
     def set_mode(self, mode: LoadMode, channel: int) -> None:
         self.set_mode_calls.append((mode, channel))
 
-    def set_level(self, value: float, channel: int, curr_limit: float | None = None) -> None:
+    def set_level(
+        self, value: float, channel: int, curr_limit: float | None = None
+    ) -> None:
         self.set_level_calls.append((value, channel, curr_limit))
 
     def output_enable(self, enable: bool, channel: int) -> None:
@@ -522,8 +531,12 @@ def test_sink_refresh_does_nothing_when_no_telemetry():
 def test_sink_refresh_updates_present_fields():
     driver = _FakeELoadDriver()
     sink = _make_sink(driver)
-    driver.voltage_telemetry = Measurement(channel_data={"sink.ch1.voltage": [47.9]}, timestamps=[1])
-    driver.current_telemetry = Measurement(channel_data={"sink.ch1.current": [11.0]}, timestamps=[1])
+    driver.voltage_telemetry = Measurement(
+        channel_data={"sink.ch1.voltage": [47.9]}, timestamps=[1]
+    )
+    driver.current_telemetry = Measurement(
+        channel_data={"sink.ch1.current": [11.0]}, timestamps=[1]
+    )
     sink.refresh()
     assert sink.voltage.measured == 47.9
     assert sink.current.measured == 11.0
@@ -537,7 +550,6 @@ def test_sink_tripped_channels_prefixes_with_sink_name():
 
 
 class _FakeInstrument:
-
     def __init__(self, tripped: list[tuple[str, Monitorable[Any]]]) -> None:
         self._tripped = tripped
 
@@ -570,7 +582,12 @@ def test_wait_for_setpoint_calls_refresh_each_poll():
         if len(calls) >= 3:
             channel.measured = True
 
-    assert stand._wait_for_setpoint(channel, timeout=1.0, refresh=(refresh,), poll_interval=0.01) is True
+    assert (
+        stand._wait_for_setpoint(
+            channel, timeout=1.0, refresh=(refresh,), poll_interval=0.01
+        )
+        is True
+    )
     assert len(calls) == 3
 
 
@@ -598,10 +615,15 @@ def test_wait_for_setpoint_requires_all_channels_at_setpoint():
     ready.measured = True
     not_ready = Controllable(default=True)
     not_ready.measured = False
-    assert stand._wait_for_setpoint(ready, not_ready, timeout=0.05, poll_interval=0.01) is False
+    assert (
+        stand._wait_for_setpoint(ready, not_ready, timeout=0.05, poll_interval=0.01)
+        is False
+    )
 
 
-def _stand_with_instruments(**tripped_by_instrument: list[tuple[str, Monitorable[Any]]]) -> EAxleStand:
+def _stand_with_instruments(
+    **tripped_by_instrument: list[tuple[str, Monitorable[Any]]],
+) -> EAxleStand:
     stand = _bare_stand()
     for attr in ("dut", "left_load", "right_load", "source", "sink"):
         setattr(stand, attr, _FakeInstrument(tripped_by_instrument.get(attr, [])))
@@ -631,7 +653,10 @@ def test_tripped_channels_reports_every_tripped_instrument():
         dut=[("dut.temperature", dut_channel)],
         sink=[("sink.voltage", sink_channel)],
     )
-    assert {name for name, _ in stand.tripped_channels()} == {"dut.temperature", "sink.voltage"}
+    assert {name for name, _ in stand.tripped_channels()} == {
+        "dut.temperature",
+        "sink.voltage",
+    }
 
 
 def test_disarm_requires_armed_state():
@@ -642,7 +667,7 @@ def test_disarm_requires_armed_state():
 
 
 def test_disarm_transitions_to_off_and_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.ARMED
     stand._disarm_timeout_s = 0.05
     stand.disarm()
@@ -654,36 +679,32 @@ def test_disarm_transitions_to_off_and_disconnects():
     assert eload.closed is True
 
 
-
-
-def _stand_with_motors() -> tuple[EAxleStand, _FakeMotor, _FakeMotor, _FakeMotor]:
-    stand = _bare_stand()
-    dut, left_load, right_load = _FakeMotor(), _FakeMotor(), _FakeMotor()
-    setattr(stand, "dut", dut)
-    setattr(stand, "left_load", left_load)
-    setattr(stand, "right_load", right_load)
-    return stand, dut, left_load, right_load
-
-
 def test_run_requires_armed_state():
-    stand, *_ = _stand_with_motors()
+    stand, *_ = _full_stand()
     stand.state = EAxleStandState.OFF
     with pytest.raises(ValueError):
         stand.run()
 
 
 def test_run_commands_every_motor_and_transitions_to_running():
-    stand, dut, left_load, right_load = _stand_with_motors()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.ARMED
+    for motor in (stand.dut, stand.left_load, stand.right_load):
+        motor.torque.setpoint = 1.0
     stand.run()
     assert stand.state == EAxleStandState.RUNNING
-    assert dut.commanded is True
-    assert left_load.commanded is True
-    assert right_load.commanded is True
+    for controller, motor in (
+        (dut_ctrl, stand.dut),
+        (left_ctrl, stand.left_load),
+        (right_ctrl, stand.right_load),
+    ):
+        assert controller.set_current_calls == [
+            pytest.approx(1.0 / motor._effective_kt)
+        ]
 
 
 def test_command_interlock_blocks_transmission_while_armed():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.ARMED
     stand.dut.torque.setpoint = 15.0
@@ -692,7 +713,7 @@ def test_command_interlock_blocks_transmission_while_armed():
 
 
 def test_command_interlock_permits_transmission_once_running():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.RUNNING
     stand.dut.torque.setpoint = 15.0
@@ -720,7 +741,7 @@ def test_command_interlock_blocks_transmission_once_tripped():
 
 
 def test_run_with_interlock_wired_actually_transmits():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, *_ = _full_stand()
     stand._wire_command_interlock()
     stand.state = EAxleStandState.ARMED
     stand.dut.torque.setpoint = 15.0
@@ -738,7 +759,9 @@ def test_wait_for_measurement_returns_true_when_already_measured():
 def test_wait_for_measurement_returns_false_on_timeout():
     stand = _bare_stand()
     channel = Monitorable(minimum=0.0, maximum=10.0)
-    assert stand._wait_for_measurement(channel, timeout=0.05, poll_interval=0.01) is False
+    assert (
+        stand._wait_for_measurement(channel, timeout=0.05, poll_interval=0.01) is False
+    )
 
 
 def test_wait_for_measurement_calls_refresh_each_poll():
@@ -751,22 +774,36 @@ def test_wait_for_measurement_calls_refresh_each_poll():
         if len(calls) >= 3:
             channel.measured = 5.0
 
-    assert stand._wait_for_measurement(channel, timeout=1.0, refresh=(refresh,), poll_interval=0.01) is True
+    assert (
+        stand._wait_for_measurement(
+            channel, timeout=1.0, refresh=(refresh,), poll_interval=0.01
+        )
+        is True
+    )
     assert len(calls) == 3
 
 
-def _full_stand() -> tuple[EAxleStand, _FakeController, _FakeController, _FakeController, _FakePSUDriver, _FakeELoadDriver]:
-    stand = _bare_stand()
+def _full_stand() -> tuple[
+    EAxleStand,
+    _FakeController,
+    _FakeController,
+    _FakeController,
+    _FakePSUDriver,
+    _FakeELoadDriver,
+]:
     dut_ctrl = _FakeController("dut")
     left_ctrl = _FakeController("left_load")
     right_ctrl = _FakeController("right_load")
-    setattr(stand, "dut", _make_motor(dut_ctrl))
-    setattr(stand, "left_load", _make_motor(left_ctrl))
-    setattr(stand, "right_load", _make_motor(right_ctrl))
     psu = _FakePSUDriver()
-    setattr(stand, "source", _make_source(psu))
     eload = _FakeELoadDriver()
-    setattr(stand, "sink", _make_sink(eload))
+    stand = EAxleStand(
+        _stand_config(),
+        dut=_make_motor(dut_ctrl),
+        left_load=_make_motor(left_ctrl),
+        right_load=_make_motor(right_ctrl),
+        source=_make_source(psu),
+        sink=_make_sink(eload),
+    )
     stand._arm_timeout_s = 1.0
     stand._stop_timeout_s = 1.0
     stand._trip_stop_timeout_s = 1.0
@@ -786,17 +823,25 @@ def test_arm_requires_off_state():
 def test_arm_transitions_to_armed_when_confirmed():
     stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.OFF
-    psu.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1])
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_temperature": [25.0]}, timestamps=[1])
-    left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_temperature": [25.0]}, timestamps=[1])
-    right_ctrl.telemetry = Measurement(channel_data={"right_load.motor_temperature": [25.0]}, timestamps=[1])
+    psu.status_telemetry = Measurement(
+        channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1]
+    )
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_temperature": [25.0]}, timestamps=[1]
+    )
+    left_ctrl.telemetry = Measurement(
+        channel_data={"left_load.motor_temperature": [25.0]}, timestamps=[1]
+    )
+    right_ctrl.telemetry = Measurement(
+        channel_data={"right_load.motor_temperature": [25.0]}, timestamps=[1]
+    )
     stand.arm()
     assert stand.state == EAxleStandState.ARMED
     assert stand.source.enabled.setpoint is True
 
 
 def test_arm_raises_when_motors_never_report_telemetry():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, *_ = _full_stand()
     stand.state = EAxleStandState.OFF
     stand._boot_timeout_s = 0.05
     with pytest.raises(TimeoutError):
@@ -811,11 +856,17 @@ def test_stop_requires_running_state():
 
 
 def test_stop_transitions_to_armed_when_ramped_down():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_current": [0.0]}, timestamps=[1])
-    left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_current": [0.0]}, timestamps=[1])
-    right_ctrl.telemetry = Measurement(channel_data={"right_load.motor_current": [0.0]}, timestamps=[1])
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_current": [0.0]}, timestamps=[1]
+    )
+    left_ctrl.telemetry = Measurement(
+        channel_data={"left_load.motor_current": [0.0]}, timestamps=[1]
+    )
+    right_ctrl.telemetry = Measurement(
+        channel_data={"right_load.motor_current": [0.0]}, timestamps=[1]
+    )
     stand.stop()
     assert stand.state == EAxleStandState.ARMED
 
@@ -831,7 +882,7 @@ def test_stop_trips_when_ramp_never_completes():
 
 
 def test_stop_commands_zero_even_when_motor_default_is_nonzero():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, _, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
@@ -839,10 +890,20 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
-    stand.dut = Motor(name="dut", controller=cast(InstroMotorController, dut_ctrl), config=nonzero_default_config)
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_current": [0.0]}, timestamps=[1])
-    left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_current": [0.0]}, timestamps=[1])
-    right_ctrl.telemetry = Measurement(channel_data={"right_load.motor_current": [0.0]}, timestamps=[1])
+    stand.dut = Motor(
+        name="dut",
+        controller=cast(InstroMotorController, dut_ctrl),
+        config=nonzero_default_config,
+    )
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_current": [0.0]}, timestamps=[1]
+    )
+    left_ctrl.telemetry = Measurement(
+        channel_data={"left_load.motor_current": [0.0]}, timestamps=[1]
+    )
+    right_ctrl.telemetry = Measurement(
+        channel_data={"right_load.motor_current": [0.0]}, timestamps=[1]
+    )
     stand.stop()
     assert stand.dut.torque.setpoint == 0.0
     assert stand.dut.speed.setpoint == 0.0
@@ -879,7 +940,11 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
     dut_ctrl = _FakeController("dut")
-    stand.dut = Motor(name="dut", controller=cast(InstroMotorController, dut_ctrl), config=nonzero_default_config)
+    stand.dut = Motor(
+        name="dut",
+        controller=cast(InstroMotorController, dut_ctrl),
+        config=nonzero_default_config,
+    )
     stand._trip_stop()
     assert stand.dut.torque.setpoint == 0.0
     assert stand.dut.speed.setpoint == 0.0
@@ -895,13 +960,21 @@ def test_trip_stop_settles_into_tripped_even_without_confirmation():
 
 
 def test_trip_stop_settles_into_tripped_when_confirmed():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 1.0
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_current": [0.0]}, timestamps=[1])
-    left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_current": [0.0]}, timestamps=[1])
-    right_ctrl.telemetry = Measurement(channel_data={"right_load.motor_current": [0.0]}, timestamps=[1])
-    psu.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [0.0]}, timestamps=[1])
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_current": [0.0]}, timestamps=[1]
+    )
+    left_ctrl.telemetry = Measurement(
+        channel_data={"left_load.motor_current": [0.0]}, timestamps=[1]
+    )
+    right_ctrl.telemetry = Measurement(
+        channel_data={"right_load.motor_current": [0.0]}, timestamps=[1]
+    )
+    psu.status_telemetry = Measurement(
+        channel_data={"source.ch1.enabled": [0.0]}, timestamps=[1]
+    )
     stand._trip_stop()
     assert stand.state == EAxleStandState.TRIPPED
 
@@ -923,7 +996,9 @@ def test_reset_transitions_to_armed_when_not_tripped():
 def test_reset_raises_when_still_tripped():
     stand, dut_ctrl, *_ = _full_stand()
     stand.state = EAxleStandState.TRIPPED
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_temperature": [150.0]}, timestamps=[1])
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_temperature": [150.0]}, timestamps=[1]
+    )
     with pytest.raises(ValueError):
         stand.reset()
     assert stand.state == EAxleStandState.TRIPPED
@@ -932,9 +1007,15 @@ def test_reset_raises_when_still_tripped():
 def test_open_commands_source_enabled_and_opens_every_instrument_when_controllers_boot():
     stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
     stand.state = EAxleStandState.OFF
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_temperature": [25.0]}, timestamps=[1])
-    left_ctrl.telemetry = Measurement(channel_data={"left_load.motor_temperature": [25.0]}, timestamps=[1])
-    right_ctrl.telemetry = Measurement(channel_data={"right_load.motor_temperature": [25.0]}, timestamps=[1])
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_temperature": [25.0]}, timestamps=[1]
+    )
+    left_ctrl.telemetry = Measurement(
+        channel_data={"left_load.motor_temperature": [25.0]}, timestamps=[1]
+    )
+    right_ctrl.telemetry = Measurement(
+        channel_data={"right_load.motor_temperature": [25.0]}, timestamps=[1]
+    )
     stand.open()
     assert psu.output_enable_calls == [(True, 1)]
     assert stand.source.enabled.setpoint is True
@@ -947,7 +1028,9 @@ def test_open_commands_source_enabled_and_opens_every_instrument_when_controller
     # otherwise it never gets enabled or configured during normal operation.
     assert stand.sink.enabled.setpoint is True
     assert stand.sink.current.setpoint == stand.sink.current.maximum
-    assert eload.set_level_calls == [(stand.sink.voltage.setpoint, 1, stand.sink.current.setpoint)]
+    assert eload.set_level_calls == [
+        (stand.sink.voltage.setpoint, 1, stand.sink.current.setpoint)
+    ]
     assert eload.output_enable_calls == [(True, 1)]
     for controller in (dut_ctrl, left_ctrl, right_ctrl):
         assert controller.opened is True
@@ -957,10 +1040,12 @@ def test_open_commands_source_enabled_and_opens_every_instrument_when_controller
 
 
 def test_open_raises_when_controllers_never_report_telemetry():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, left_ctrl, right_ctrl, psu, _ = _full_stand()
     stand.state = EAxleStandState.OFF
     stand._boot_timeout_s = 0.05
-    psu.status_telemetry = Measurement(channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1])
+    psu.status_telemetry = Measurement(
+        channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1]
+    )
     with pytest.raises(TimeoutError):
         stand.open()
     for controller in (dut_ctrl, left_ctrl, right_ctrl):
@@ -980,7 +1065,7 @@ def test_close_from_off_is_a_noop():
 
 
 def test_close_from_running_trip_stops_then_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 0.05
     stand._disarm_timeout_s = 0.05
@@ -1013,13 +1098,15 @@ def test_close_disconnects_even_when_still_tripped_after_trip_stop():
     stand.state = EAxleStandState.RUNNING
     stand._trip_stop_timeout_s = 0.05
     stand._disarm_timeout_s = 0.05
-    dut_ctrl.telemetry = Measurement(channel_data={"dut.motor_temperature": [150.0]}, timestamps=[1])
+    dut_ctrl.telemetry = Measurement(
+        channel_data={"dut.motor_temperature": [150.0]}, timestamps=[1]
+    )
     stand.close()  # must not raise
     assert stand.state == EAxleStandState.OFF
 
 
 def test_close_from_already_tripped_does_not_re_trip_but_still_disconnects():
-    stand, dut_ctrl, left_ctrl, right_ctrl, psu, eload = _full_stand()
+    stand, dut_ctrl, _, _, psu, eload = _full_stand()
     stand.state = EAxleStandState.TRIPPED
     stand._disarm_timeout_s = 0.05
     stand.close()
@@ -1054,7 +1141,7 @@ def _stand_config() -> EAxleStandConfig:
 
 
 def _init_stand() -> EAxleStand:
-    return EAxleStand(
+    return EAxleStand.from_drivers(
         _stand_config(),
         cast(InstroMotorController, _FakeController("dut")),
         cast(InstroMotorController, _FakeController("left_load")),
