@@ -6,6 +6,7 @@ the wiring. The main loop here mirrors the UI's inputs onto the stand's setpoint
 every channel's measured value back to Connect.
 """
 
+import logging
 import time
 from typing import Literal
 
@@ -30,6 +31,23 @@ CONTROL_MODES: dict[str, Literal["torque", "velocity", "current"]] = {
 }
 
 
+def install_library_logging(level: int = logging.INFO) -> None:
+    """Route the libraries' stdlib logs to stderr, where Connect picks them up.
+
+    `connect_python.get_logger` returns a plain stdlib logger with a stderr StreamHandler,
+    so there is no Connect-specific sink to forward to -- library loggers just need a
+    handler of their own. `%(name)s` keeps each record's originating module (`e_axle.stand`,
+    `instro.psu`, ...) visible in the Connect log pane.
+    """
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
+    for name, package_level in (("e_axle", level), ("instro", logging.WARNING)):
+        package_logger = logging.getLogger(name)
+        package_logger.setLevel(package_level)
+        package_logger.handlers = [handler]
+        package_logger.propagate = False
+
+
 def apply_motor_inputs(
     client: connect_python.Client, motor: Motor, prefix: str
 ) -> None:
@@ -47,6 +65,7 @@ def apply_motor_inputs(
         value = client.get_value(f"{prefix}-{suffix}")
         if value is None:
             continue
+        logger.debug(f"value: {value}")
         channel = getattr(motor, channel_name)
         channel.setpoint = float(value)
         if channel.setpoint != channel.requested:
@@ -119,6 +138,7 @@ def stream_telemetry(client: connect_python.Client, stand: EAxleStand) -> None:
 
 @connect_python.main
 def main(client: connect_python.Client) -> None:
+    install_library_logging()
     stand = build_stand()
     logger.info("Stand built, waiting on UI inputs")
     try:
