@@ -305,7 +305,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "gs-usb", git = "https://github.com/MickHarrigan/gs_usb?branch=mh%2Ffix%2Foptional-start-reset" },
-    { name = "instro", extras = ["unstable"], specifier = ">=1.20.0" },
+    { name = "instro", extras = ["unstable"], git = "https://github.com/nominal-io/instro?branch=main" },
     { name = "instro-unstable", specifier = ">=1.11.0" },
     { name = "python-can", specifier = ">=4.6.1" },
     { name = "pyusb", specifier = ">=1.3.1" },
@@ -499,7 +499,7 @@ wheels = [
 [[package]]
 name = "instro"
 version = "1.20.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/nominal-io/instro?branch=main#009ab0ca957d645b657b8117aeddf860b46856d5" }
 dependencies = [
     { name = "fastavro", extra = ["snappy"] },
     { name = "nominal" },
@@ -512,10 +512,6 @@ dependencies = [
     { name = "thermocouples" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/db/af3d3f549b8f38f73cd74c8cbe050917b7a5329908be7eee97ff04a5490f/instro-1.20.0.tar.gz", hash = "sha256:cca52edbb513b63b37ce400804ecbdba8b422837da4c62452187a20b1dcb630c", size = 8064794, upload-time = "2026-09-11T17:00:21.58Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/af/69397757e838cf2a4b5d76dc7393023217fae7407c0de5b2ade7dce462bb/instro-1.20.0-py3-none-any.whl", hash = "sha256:375b4be0e86549d0401a544f1a2482562776f0fbe30327af73a65e48d6bf0dbd", size = 197754, upload-time = "2026-09-11T17:00:19.88Z" },
-]
 
 [package.optional-dependencies]
 unstable = [
@@ -525,7 +521,7 @@ unstable = [
 [[package]]
 name = "instro-unstable"
 version = "1.11.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/nominal-io/instro?subdirectory=packages%2Finstro-unstable&branch=main#009ab0ca957d645b657b8117aeddf860b46856d5" }
 dependencies = [
     { name = "gs-usb" },
     { name = "instro" },
@@ -533,10 +529,6 @@ dependencies = [
     { name = "pyserial" },
     { name = "python-can" },
     { name = "scikit-rf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/32/41/5ee155ccfaf5d31fc07d414ee5196f94ec4c80832b076d0608cf0025b57d/instro_unstable-1.11.0.tar.gz", hash = "sha256:59935409d646c1df8a33e08a5cd3b4be0ac33f9c06c6c40e3c658a24c6ce8479", size = 36671, upload-time = "2026-09-04T18:48:42.149Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/51/7817568114afd3144ea1813a8d58572889a7e9d0ea266beca089797fc1d5/instro_unstable-1.11.0-py3-none-any.whl", hash = "sha256:04da2765c91b7954ed37c16898471c52bc151455253fac330e86b75a0136cedd", size = 47871, upload-time = "2026-09-04T18:48:40.97Z" },
 ]
 
 [[package]]

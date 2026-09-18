@@ -54,13 +54,13 @@ class Component(ABC):
 
 
 class Motor(Component):
-    """One motor controller's channels and control logic: torque, speed, current, active mode, and temperature."""
+    """One motor controller's channels and control logic: torque, velocity, current, active mode, and temperature."""
 
     controller: InstroMotorController
     torque: ControllableNumeric
-    speed: ControllableNumeric
+    velocity: ControllableNumeric
     current: ControllableNumeric
-    control_mode: Controllable[Literal["torque", "speed", "current"]]
+    control_mode: Controllable[Literal["torque", "velocity", "current"]]
     temperature: Monitorable[float]
 
     def __init__(
@@ -78,10 +78,10 @@ class Motor(Component):
             minimum=config.torque.minimum,
             maximum=config.torque.maximum,
         )
-        self.speed = ControllableNumeric(
-            default=config.speed.default,
-            minimum=config.speed.minimum,
-            maximum=config.speed.maximum,
+        self.velocity = ControllableNumeric(
+            default=config.velocity.default,
+            minimum=config.velocity.minimum,
+            maximum=config.velocity.maximum,
         )
         self.current = ControllableNumeric(
             default=config.current.default,
@@ -118,7 +118,7 @@ class Motor(Component):
             self.current.measured = current
             self.torque.measured = current * self._effective_kt
         if (key := f"{prefix}.velocity") in measurement.channel_data:
-            self.speed.measured = float(measurement.channel_data[key][-1])
+            self.velocity.measured = float(measurement.channel_data[key][-1])
         if (key := f"{prefix}.motor_temperature") in measurement.channel_data:
             self.temperature.measured = float(measurement.channel_data[key][-1])
 
@@ -129,15 +129,15 @@ class Motor(Component):
         mode = self.control_mode.setpoint
         if mode == "torque":
             self.controller.set_current(self.torque.setpoint / self._effective_kt)
-        elif mode == "speed":
-            self.controller.set_velocity(self.speed.setpoint)
+        elif mode == "velocity":
+            self.controller.set_velocity(self.velocity.setpoint)
         elif mode == "current":
             self.controller.set_current(self.current.setpoint)
 
     @property
     def active_channel(self) -> ControllableNumeric:
         """The channel currently being commanded, per this motor's control mode."""
-        return {"torque": self.torque, "speed": self.speed, "current": self.current}[
+        return {"torque": self.torque, "velocity": self.velocity, "current": self.current}[
             self.control_mode.setpoint
         ]
 
@@ -174,7 +174,6 @@ class Source(Component):
         # command() ever runs, would otherwise fire a spurious trip).
         self.ovp_limit = Controllable(default=config.ovp_limit.default)
         self.ocp_limit = Controllable(default=config.ocp_limit.default)
-        driver.add_background_daemon_function(self.command)
         driver.add_background_daemon_function(self.refresh)
 
     def open(self) -> None:
@@ -203,6 +202,11 @@ class Source(Component):
         if status is not None and (key := f"{prefix}.enabled") in status.channel_data:
             self.enabled.measured = bool(status.channel_data[key][-1])
 
+    def refresh_protection_limits(self) -> None:
+        """Read back the configured OVP/OCP thresholds. They only move when command() writes
+        them, so this confirms the write instead of running in the poll loop."""
+        prefix = f"{self.driver.name}.ch{self._channel}"
+
         ovp = self.driver.get_overvoltage_protection_level(channel=self._channel)
         if ovp is not None and (key := f"{prefix}.ovp") in ovp.channel_data:
             self.ovp_limit.measured = float(ovp.channel_data[key][-1])
@@ -212,7 +216,7 @@ class Source(Component):
             self.ocp_limit.measured = float(ocp.channel_data[key][-1])
 
     def command(self) -> None:
-        """Send this source's setpoints to the supply."""
+        """Send this source's setpoints to the supply, confirming the protection thresholds landed."""
         self.driver.set_voltage(self.voltage.setpoint, channel=self._channel)
         self.driver.set_current_limit(self.current.setpoint, channel=self._channel)
         self.driver.output_enable(self.enabled.setpoint, channel=self._channel)
@@ -222,6 +226,7 @@ class Source(Component):
         self.driver.set_overcurrent_protection_level(
             self.ocp_limit.setpoint, channel=self._channel
         )
+        self.refresh_protection_limits()
 
 
 class Sink(Component):
@@ -248,19 +253,26 @@ class Sink(Component):
             maximum=config.current.maximum,
         )
         self.enabled = Controllable(default=config.enabled.default)
-        driver.add_background_daemon_function(self.command)
-        driver.add_background_daemon_function(self.refresh)
 
     def open(self) -> None:
-        """Open the load's connection, fix it in CV mode, and start its background daemon."""
+        """Open the load's connection and fix it in CV mode. No background daemon: the sink
+        shares one socket and one meter with the source, whose poller reads the box for both."""
         self.driver.open()
         self.driver.set_mode(LoadMode.CV, channel=self._channel)
-        self.driver.start()
 
     def close(self) -> None:
         """Stop the background daemon and close the load's connection."""
         self.driver.stop()
         self.driver.close()
+
+    def adopt_terminal(self, voltage: float | None, current: float | None) -> None:
+        """Take a terminal reading the source quadrant already made. One meter serves both
+        quadrants: voltage is shared as-is, and current flips sign for the sink-positive
+        convention the e-load drivers report in."""
+        if voltage is not None:
+            self.voltage.measured = voltage
+        if current is not None:
+            self.current.measured = -current
 
     def refresh(self) -> None:
         """Pull fresh telemetry from the load and update this sink's channels."""
@@ -350,6 +362,7 @@ class EAxleStand:
         self.state = EAxleStandState.OFF
         self._wire_trip_delegates()
         self._wire_command_interlock()
+        self._wire_psb_telemetry()
 
     @classmethod
     def from_drivers(
@@ -471,7 +484,7 @@ class EAxleStand:
         self.state = EAxleStandState.STOPPING
         for motor in (self.dut, self.left_load, self.right_load):
             motor.torque.setpoint = 0.0
-            motor.speed.setpoint = 0.0
+            motor.velocity.setpoint = 0.0
             motor.current.setpoint = 0.0
             motor.command()
         ramped_down = self._wait_for_setpoint(
@@ -494,7 +507,7 @@ class EAxleStand:
             self.state = EAxleStandState.TRIP_STOPPING
         for motor in (self.dut, self.left_load, self.right_load):
             motor.torque.setpoint = 0.0
-            motor.speed.setpoint = 0.0
+            motor.velocity.setpoint = 0.0
             motor.current.setpoint = 0.0
             motor.command()
         self.source.enabled.setpoint = False
@@ -550,6 +563,20 @@ class EAxleStand:
                     channel.on_trip = partial(
                         self._on_trip, f"{instrument.name}.{attr}"
                     )
+
+    def _refresh_sink_from_source(self) -> None:
+        """Hand the sink the terminal reading the source's poller just took."""
+        self.sink.adopt_terminal(
+            self.source.voltage.measured, self.source.current.measured
+        )
+
+    def _wire_psb_telemetry(self) -> None:
+        """Make the source's daemon the box's only poller. Both quadrants are one PSB behind one
+        socket, so a second polling thread just doubles the SCPI load and contends for the same
+        transport lock. Registered after Source.__init__'s own refresh, so it runs on fresh values."""
+        self.source.driver.add_background_daemon_function(
+            self._refresh_sink_from_source
+        )
 
     def _wire_command_interlock(self) -> None:
         """Wire every motor's command_enabled to whether the stand is RUNNING, STOPPING, or TRIP_STOPPING."""

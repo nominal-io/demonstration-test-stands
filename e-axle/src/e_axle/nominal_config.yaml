@@ -5,7 +5,7 @@ trip_stop_timeout_s: 2.0  # PLACEHOLDER -- best-effort window for the emergency 
 boot_timeout_s: 10.0  # PLACEHOLDER -- max time to wait for source output to come on line and motor controllers to boot on open(); unconfirmed against real boot time
 
 dut_controller:
-  speed:  # mechanical RPM -- VESC6.set_velocity converts to ERPM itself via pole_pairs
+  velocity:  # mechanical RPM -- VESC6.set_velocity converts to ERPM itself via pole_pairs
     default: 0.0
     minimum: -3000.0  # symmetric with current's +/-35 A; a nonneg floor trips on ordinary rest jitter
     maximum: 3000.0  # 12000 ERPM command ceiling / 4 pole pairs
@@ -22,9 +22,9 @@ dut_controller:
     maximum: 100.0  # manual: "Motor temperature | > 100 C | Immediate"; matches old MAX_MOTOR_C
 
 left_load_controller:
-  speed:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
+  velocity:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
     default: 0.0
-    minimum: -471.429  # 3300 ERPM overspeed trip / 7 pole pairs; no separate command ceiling exists
+    minimum: -471.429  # 3300 ERPM overvelocity trip / 7 pole pairs; no separate command ceiling exists
     maximum: 471.429
   current:
     default: 0.0
@@ -39,9 +39,9 @@ left_load_controller:
     maximum: 100.0  # manual: "Motor temperature | > 100 C | Immediate"; matches old MAX_MOTOR_C
 
 right_load_controller:
-  speed:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
+  velocity:  # mechanical RPM; never actually commanded -- absorbers are current-commanded only
     default: 0.0
-    minimum: -471.429  # 3300 ERPM overspeed trip / 7 pole pairs; no separate command ceiling exists
+    minimum: -471.429  # 3300 ERPM overvelocity trip / 7 pole pairs; no separate command ceiling exists
     maximum: 471.429
   current:
     default: 0.0

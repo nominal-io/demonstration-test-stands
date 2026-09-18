@@ -81,7 +81,7 @@ class _FakeController:
 def _dut_config() -> DutControllerConfig:
     return DutControllerConfig(
         torque=ControllableNumericConfig(default=0.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=0.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -101,7 +101,7 @@ def test_motor_init_builds_channels_from_config():
     assert motor.name == "dut"
     assert motor.controller is cast(InstroMotorController, controller)
     assert motor.torque.maximum == 27.5
-    assert motor.speed.minimum == -3000.0
+    assert motor.velocity.minimum == -3000.0
     assert motor.current.maximum == 35.0
     assert motor.temperature.minimum == 0.0
     assert motor.temperature.maximum == 100.0
@@ -139,11 +139,11 @@ def test_motor_command_torque_mode_converts_to_current():
     assert controller.set_current_calls == [pytest.approx(10.0 / motor._effective_kt)]
 
 
-def test_motor_command_speed_mode_sends_velocity():
+def test_motor_command_velocity_mode_sends_velocity():
     controller = _FakeController()
     motor = _make_motor(controller)
-    motor.speed.setpoint = 500.0
-    motor.control_mode.setpoint = "speed"
+    motor.velocity.setpoint = 500.0
+    motor.control_mode.setpoint = "velocity"
     motor.command()
     assert controller.set_velocity_calls == [500.0]
 
@@ -189,7 +189,7 @@ def test_motor_refresh_does_nothing_when_no_telemetry():
     motor = _make_motor(controller)
     motor.refresh()
     assert motor.current.measured is None
-    assert motor.speed.measured is None
+    assert motor.velocity.measured is None
     assert motor.temperature.measured is None
 
 
@@ -206,7 +206,7 @@ def test_motor_refresh_updates_present_fields():
     )
     motor.refresh()
     assert motor.current.measured == 7.0
-    assert motor.speed.measured == 1200.0
+    assert motor.velocity.measured == 1200.0
     assert motor.temperature.measured == 42.0
     assert motor.torque.measured == pytest.approx(7.0 * motor._effective_kt)
 
@@ -218,7 +218,7 @@ def test_motor_refresh_ignores_missing_fields():
         channel_data={"dut.velocity": [900.0]}, timestamps=[123]
     )
     motor.refresh()
-    assert motor.speed.measured == 900.0
+    assert motor.velocity.measured == 900.0
     assert motor.current.measured is None
     assert motor.temperature.measured is None
 
@@ -364,8 +364,6 @@ def test_source_refresh_does_nothing_when_no_telemetry():
     assert source.voltage.measured is None
     assert source.current.measured is None
     assert source.enabled.measured is None
-    assert source.ovp_limit.measured is None
-    assert source.ocp_limit.measured is None
 
 
 def test_source_refresh_updates_present_fields():
@@ -380,6 +378,15 @@ def test_source_refresh_updates_present_fields():
     driver.status_telemetry = Measurement(
         channel_data={"source.ch1.enabled": [1.0]}, timestamps=[1]
     )
+    source.refresh()
+    assert source.voltage.measured == 48.2
+    assert source.current.measured == 9.5
+    assert source.enabled.measured is True
+
+
+def test_source_refresh_leaves_protection_limits_out_of_the_poll_loop():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
     driver.ovp_telemetry = Measurement(
         channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
     )
@@ -387,9 +394,34 @@ def test_source_refresh_updates_present_fields():
         channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
     )
     source.refresh()
-    assert source.voltage.measured == 48.2
-    assert source.current.measured == 9.5
-    assert source.enabled.measured is True
+    assert source.ovp_limit.measured is None
+    assert source.ocp_limit.measured is None
+
+
+def test_source_refresh_protection_limits_reads_back_the_thresholds():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
+    driver.ovp_telemetry = Measurement(
+        channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
+    )
+    driver.ocp_telemetry = Measurement(
+        channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
+    )
+    source.refresh_protection_limits()
+    assert source.ovp_limit.measured == 60.0
+    assert source.ocp_limit.measured == 25.0
+
+
+def test_source_command_confirms_the_protection_limits_landed():
+    driver = _FakePSUDriver()
+    source = _make_source(driver)
+    driver.ovp_telemetry = Measurement(
+        channel_data={"source.ch1.ovp": [60.0]}, timestamps=[1]
+    )
+    driver.ocp_telemetry = Measurement(
+        channel_data={"source.ch1.ocp": [25.0]}, timestamps=[1]
+    )
+    source.command()
     assert source.ovp_limit.measured == 60.0
     assert source.ocp_limit.measured == 25.0
 
@@ -433,6 +465,7 @@ class _FakeELoadDriver:
         self.output_enable_calls = []
         self.voltage_telemetry: Measurement | None = None
         self.current_telemetry: Measurement | None = None
+        self.read_count = 0
         self.daemon_functions = []
 
     def add_background_daemon_function(self, func) -> None:
@@ -462,9 +495,11 @@ class _FakeELoadDriver:
         self.output_enable_calls.append((enable, channel))
 
     def get_voltage(self, channel: int) -> Measurement | None:
+        self.read_count += 1
         return self.voltage_telemetry
 
     def get_current(self, channel: int) -> Measurement | None:
+        self.read_count += 1
         return self.current_telemetry
 
 
@@ -492,13 +527,17 @@ def test_sink_init_builds_channels_from_config():
     assert sink.enabled.setpoint is False
 
 
-def test_sink_open_opens_fixes_mode_and_starts_the_driver():
+def test_sink_open_opens_and_fixes_mode_without_starting_a_second_poller():
     driver = _FakeELoadDriver()
     sink = _make_sink(driver)
     sink.open()
     assert driver.opened is True
     assert driver.set_mode_calls == [(LoadMode.CV, 1)]
-    assert driver.started is True
+    # The sink shares one socket and one meter with the source, whose daemon reads
+    # the box for both quadrants. A second polling thread would only double the
+    # SCPI load and contend for the same transport lock.
+    assert driver.started is False
+    assert driver.daemon_functions == []
 
 
 def test_sink_close_stops_and_closes_the_driver():
@@ -538,6 +577,26 @@ def test_sink_refresh_updates_present_fields():
         channel_data={"sink.ch1.current": [11.0]}, timestamps=[1]
     )
     sink.refresh()
+    assert sink.voltage.measured == 47.9
+    assert sink.current.measured == 11.0
+
+
+def test_sink_adopt_terminal_shares_voltage_and_flips_current_sign():
+    driver = _FakeELoadDriver()
+    sink = _make_sink(driver)
+    sink.adopt_terminal(47.9, -11.0)
+    assert sink.voltage.measured == 47.9
+    # The source quadrant reads source-positive, so regeneration into the box is
+    # negative there and positive here.
+    assert sink.current.measured == 11.0
+
+
+def test_sink_adopt_terminal_ignores_absent_readings():
+    driver = _FakeELoadDriver()
+    sink = _make_sink(driver)
+    sink.voltage.measured = 47.9
+    sink.current.measured = 11.0
+    sink.adopt_terminal(None, None)
     assert sink.voltage.measured == 47.9
     assert sink.current.measured == 11.0
 
@@ -701,6 +760,30 @@ def test_run_commands_every_motor_and_transitions_to_running():
         assert controller.set_current_calls == [
             pytest.approx(1.0 / motor._effective_kt)
         ]
+
+
+def test_psb_telemetry_is_polled_only_by_the_source_daemon():
+    stand, _, _, _, psu, eload = _full_stand()
+    # One box behind one socket: the source's daemon polls it, then fans the reading
+    # out to the sink. The sink registers nothing of its own.
+    assert stand._refresh_sink_from_source in psu.daemon_functions
+    assert eload.daemon_functions == []
+
+
+def test_psb_telemetry_fan_out_gives_the_sink_the_sources_reading():
+    stand, _, _, _, psu, eload = _full_stand()
+    psu.voltage_telemetry = Measurement(
+        channel_data={"source.ch1.voltage": [48.2]}, timestamps=[1]
+    )
+    psu.current_telemetry = Measurement(
+        channel_data={"source.ch1.current": [-9.5]}, timestamps=[1]
+    )
+    stand.source.refresh()
+    stand._refresh_sink_from_source()
+    assert stand.sink.voltage.measured == 48.2
+    assert stand.sink.current.measured == 9.5
+    # The fan-out must not re-query the box for values the source already read.
+    assert eload.read_count == 0
 
 
 def test_command_interlock_blocks_transmission_while_armed():
@@ -886,7 +969,7 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -906,7 +989,7 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     )
     stand.stop()
     assert stand.dut.torque.setpoint == 0.0
-    assert stand.dut.speed.setpoint == 0.0
+    assert stand.dut.velocity.setpoint == 0.0
     assert stand.dut.current.setpoint == 0.0
 
 
@@ -916,14 +999,14 @@ def test_trip_stop_zeros_every_motor_and_disables_source_and_sink():
     stand._trip_stop_timeout_s = 0.05
     for motor in (stand.dut, stand.left_load, stand.right_load):
         motor.torque.setpoint = 10.0
-        motor.speed.setpoint = 500.0
+        motor.velocity.setpoint = 500.0
         motor.current.setpoint = 5.0
     stand.source.enabled.setpoint = True
     stand.sink.enabled.setpoint = True
     stand._trip_stop()
     for motor in (stand.dut, stand.left_load, stand.right_load):
         assert motor.torque.setpoint == motor.torque.default
-        assert motor.speed.setpoint == motor.speed.default
+        assert motor.velocity.setpoint == motor.velocity.default
         assert motor.current.setpoint == motor.current.default
     assert stand.source.enabled.setpoint is False
     assert stand.sink.enabled.setpoint is False
@@ -935,7 +1018,7 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand._trip_stop_timeout_s = 0.05
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        speed=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -947,7 +1030,7 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     )
     stand._trip_stop()
     assert stand.dut.torque.setpoint == 0.0
-    assert stand.dut.speed.setpoint == 0.0
+    assert stand.dut.velocity.setpoint == 0.0
     assert stand.dut.current.setpoint == 0.0
 
 
@@ -1119,7 +1202,7 @@ def test_close_from_already_tripped_does_not_re_trip_but_still_disconnects():
 def _load_config() -> LoadControllerConfig:
     return LoadControllerConfig(
         torque=ControllableNumericConfig(default=0.0, minimum=-3.8, maximum=3.8),
-        speed=ControllableNumericConfig(default=0.0, minimum=-471.0, maximum=471.0),
+        velocity=ControllableNumericConfig(default=0.0, minimum=-471.0, maximum=471.0),
         current=ControllableNumericConfig(default=0.0, minimum=-20.0, maximum=20.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )

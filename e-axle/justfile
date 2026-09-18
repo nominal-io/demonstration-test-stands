@@ -6,16 +6,20 @@ all: check lint format test
 
 # Runs `ty` checks
 check *ARGS:
-    uv run ty check src tests {{ARGS}}
+    uv run ty check src tests app {{ARGS}}
 
 # Runs `ruff` checks
 lint *ARGS:
-    uv run ruff check src tests {{ARGS}}
+    uv run ruff check src tests app {{ARGS}}
 
 # Runs `ruff` formatting
 format *ARGS:
-    uv run ruff format src tests {{ARGS}}
+    uv run ruff format src tests app {{ARGS}}
 
 # Runs `pytest` on all tests in `tests/`
 test *ARGS:
-    uv run pytest tests {{ARGS}}
+    uv run pytest tests app {{ARGS}}
+
+# Builds the wheel and places it within `app/wheels`
+build *ARGS:
+    uv build --wheel -o app/wheels {{ARGS}}
