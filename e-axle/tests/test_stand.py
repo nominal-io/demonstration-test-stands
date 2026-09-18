@@ -1,4 +1,5 @@
 import threading
+from functools import partial
 from typing import Any, cast
 
 import pytest
@@ -937,6 +938,17 @@ def test_open_commands_source_enabled_and_opens_every_instrument_when_controller
     stand.open()
     assert psu.output_enable_calls == [(True, 1)]
     assert stand.source.enabled.setpoint is True
+    # The source's current limit must be commanded to its real operating
+    # maximum, not its 0.0 idle default -- a 0 A limit would prevent the bus
+    # from ever actually reaching voltage, so the motor controllers can't boot.
+    assert stand.source.current.setpoint == stand.source.current.maximum
+    assert psu.set_current_limit_calls == [(stand.source.current.maximum, 1)]
+    # The sink must actually be commanded during open(), not just connected --
+    # otherwise it never gets enabled or configured during normal operation.
+    assert stand.sink.enabled.setpoint is True
+    assert stand.sink.current.setpoint == stand.sink.current.maximum
+    assert eload.set_level_calls == [(stand.sink.voltage.setpoint, 1, stand.sink.current.setpoint)]
+    assert eload.output_enable_calls == [(True, 1)]
     for controller in (dut_ctrl, left_ctrl, right_ctrl):
         assert controller.opened is True
         assert controller.started is True
@@ -1074,9 +1086,14 @@ def test_init_sets_every_timeout_from_config():
 
 def test_init_wires_trip_delegates_on_monitorable_channels():
     stand = _init_stand()
-    assert stand.dut.temperature.on_trip == stand._on_trip
-    assert stand.source.voltage.on_trip == stand._on_trip
-    assert stand.sink.voltage.on_trip == stand._on_trip
+    for channel, name in (
+        (stand.dut.temperature, "dut.temperature"),
+        (stand.source.voltage, "source.voltage"),
+        (stand.sink.voltage, "sink.voltage"),
+    ):
+        on_trip = cast(partial, channel.on_trip)
+        assert on_trip.func == stand._on_trip
+        assert on_trip.args == (name,)
 
 
 def test_init_does_not_wire_trip_delegate_on_ovp_ocp():
