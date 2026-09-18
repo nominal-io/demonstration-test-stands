@@ -17,7 +17,7 @@ from e_axle import EAxleStand, EAxleStandState, Motor, build_stand
 logger = connect_python.get_logger(__name__)
 
 
-POLL_INTERVAL_S = 0.1
+POLL_INTERVAL_S = 1.0
 
 STREAM_ID = "stand"
 STATE_STREAM_ID = "stand_state"
