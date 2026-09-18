@@ -13,26 +13,32 @@ streaming:
   window: null
   persistence: []
   channels:
-  - channel: alarms.engine_fire
-  - channel: alarms.hyd_press_low
-  - channel: alarms.oil_press_low
-  - channel: alarms.pitot_heat
-  - channel: demo.altitude
-  - channel: demo.engine_rpm
-  - channel: demo.heading
-  - channel: demo.hydraulic_pressure
-  - channel: demo.latitude
-  - channel: demo.longitude
-  - channel: demo.oil_pressure
-  - channel: demo.oil_temperature
-  - channel: demo.pitch
-  - channel: demo.pump_flow_rate
-  - channel: demo.roll
-  - channel: demo.velocity
+  - channel: stand.dut.current
+  - channel: stand.dut.speed
+  - channel: stand.dut.temperature
+  - channel: stand.dut.torque
+  - channel: stand.dut.velocity
+  - channel: stand.left.current
+  - channel: stand.left.speed
+  - channel: stand.left.temperature
+  - channel: stand.left.torque
+  - channel: stand.left.velocity
+  - channel: stand.right.current
+  - channel: stand.right.speed
+  - channel: stand.right.temperature
+  - channel: stand.right.torque
+  - channel: stand.right.velocity
+  - channel: stand.sink.current
+  - channel: stand.sink.voltage
+  - channel: stand.source.current
+  - channel: stand.source.ocp_limit
+  - channel: stand.source.ovp_limit
+  - channel: stand.source.voltage
   - channel: stand_state.state
 python:
   packages:
   - e-axle
+  - instro
   wheelhouse: wheels
 on_load: null
 on_unload: null
@@ -44,115 +50,147 @@ tiles:
     tile:
       layout: grid
       rows:
-      - height: 1.3514563
+      - height: 0.7790559
         columns:
         - width: 0.171419
           tile:
-            layout: pane
-            id: 11a0a371-8911-4e06-ace0-3da5edfa06ae
-            title: LEFT MOTOR CONTROL
-            direction: vertical
-            should_fill: true
-            elements:
-            - spacing: normal
-              inputs:
-              - input: number
-                id: left-torque
-                label: Torque
-                default: 0.0
-                units: Nm
-              - input: number
-                id: left-current
-                label: Current
-                default: 0.0
-                min: -20.0
-                max: 20.0
-                stepper:
-                  amount: 1.0
-                units: A
-              - input: number
-                id: left-velocity
-                label: Velocity
-                default: 0.0
-                units: RPM
-        - width: 0.10933025
-          tile:
-            layout: pane
-            id: c31ab83e-6c10-4207-8e1d-ebb709d12825
-            title: LEFT MOTOR STATE
-            direction: vertical
-            should_fill: true
-            elements:
-            - dashboard: alarms
-              stream_id: stand
-              signals:
-              - label: Torque
-                color: safe
-                channel: left.torque
-              - label: Current
-                color: safe
-                channel: left.current
-              - label: Velocity
-                color: safe
-                channel: left.velocity
-              cols: 3
-              row_gap: null
-              col_gap: null
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 11a0a371-8911-4e06-ace0-3da5edfa06ae
+                  title: LEFT MOTOR CONTROL
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: dropdown
+                      id: left-mode
+                      label: Control Mode
+                      options:
+                      - Torque
+                      - Current
+                      - Velocity
+                      default: Torque
+                    - input: number
+                      id: left-torque
+                      label: Torque
+                      default: 0.0
+                      units: Nm
+                    - input: number
+                      id: left-current
+                      label: Current
+                      default: 0.0
+                      min: -20.0
+                      max: 20.0
+                      stepper:
+                        amount: 1.0
+                      units: A
+                    - input: number
+                      id: left-velocity
+                      label: Velocity
+                      default: 0.0
+                      units: RPM
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: c31ab83e-6c10-4207-8e1d-ebb709d12825
+                  title: LEFT MOTOR STATE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - dashboard: alarms
+                    stream_id: stand
+                    signals:
+                    - label: Torque
+                      color: safe
+                      channel: left.torque
+                    - label: Current
+                      color: safe
+                      channel: left.current
+                    - label: Velocity
+                      color: safe
+                      channel: left.speed
+                    cols: 3
+                    row_gap: null
+                    col_gap: null
         - width: 0.17344357
           tile:
-            layout: pane
-            id: 8d14973f-c099-406b-849d-bbe29e8c8eaa
-            title: RIGHT MOTOR CONTROL
-            direction: vertical
-            should_fill: true
-            elements:
-            - spacing: normal
-              inputs:
-              - input: number
-                id: right-torque
-                label: Torque
-                default: 0.0
-                units: Nm
-              - input: number
-                id: right-current
-                label: Current
-                default: 0.0
-                min: -20.0
-                max: 20.0
-                stepper:
-                  amount: 1.0
-                units: A
-              - input: number
-                id: right-velocity
-                label: Velocity
-                default: 0.0
-                units: RPM
-        - width: 0.1073056
-          tile:
-            layout: pane
-            id: fdd863ef-d9bf-4c08-9911-5b375e9a6f3a
-            title: RIGHT MOTOR STATE
-            direction: vertical
-            should_fill: true
-            elements:
-            - dashboard: alarms
-              stream_id: stand
-              signals:
-              - label: Torque
-                color: safe
-                channel: right.torque
-              - label: Current
-                color: safe
-                channel: right.current
-              - label: Velocity
-                color: safe
-                channel: right.velocity
-              cols: 3
-              row_gap: null
-              col_gap: null
-      - height: 0.66074
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 8d14973f-c099-406b-849d-bbe29e8c8eaa
+                  title: RIGHT MOTOR CONTROL
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: dropdown
+                      id: right-mode
+                      label: Control Mode
+                      options:
+                      - Torque
+                      - Current
+                      - Velocity
+                      default: Torque
+                    - input: number
+                      id: right-torque
+                      label: Torque
+                      default: 0.0
+                      units: Nm
+                    - input: number
+                      id: right-current
+                      label: Current
+                      default: 0.0
+                      min: -20.0
+                      max: 20.0
+                      stepper:
+                        amount: 1.0
+                      units: A
+                    - input: number
+                      id: right-velocity
+                      label: Velocity
+                      default: 0.0
+                      units: RPM
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: fdd863ef-d9bf-4c08-9911-5b375e9a6f3a
+                  title: RIGHT MOTOR STATE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - dashboard: alarms
+                    stream_id: stand
+                    signals:
+                    - label: Torque
+                      color: safe
+                      channel: right.torque
+                    - label: Current
+                      color: safe
+                      channel: right.current
+                    - label: Velocity
+                      color: safe
+                      channel: right.speed
+                    cols: 3
+                    row_gap: null
+                    col_gap: null
+      - height: 0.55741227
         columns:
-        - width: 1.0
+        - width: 0.9941861
           tile:
             layout: pane
             id: 86254d0d-a024-4f13-8e0b-8c2bf8347d49
@@ -162,6 +200,14 @@ tiles:
             elements:
             - spacing: normal
               inputs:
+              - input: dropdown
+                id: dut-mode
+                label: Control Mode
+                options:
+                - Torque
+                - Current
+                - Velocity
+                default: Torque
               - input: number
                 id: dut-torque
                 label: Torque
@@ -181,7 +227,7 @@ tiles:
                 label: Velocity
                 default: 0.0
                 units: RPM
-        - width: 1.0
+        - width: 1.0058141
           tile:
             layout: pane
             id: 65a9acea-7048-4371-955c-c486be6f6e5f
@@ -200,7 +246,7 @@ tiles:
                 channel: dut.current
               - label: Velocity
                 color: safe
-                channel: dut.velocity
+                channel: dut.speed
               cols: 3
               row_gap: null
               col_gap: null
@@ -222,6 +268,7 @@ tiles:
                 off_label: Disabled
                 off_color: rgb(255, 0, 0)
                 on_color: rgb(0, 255, 0)
+                default: true
         - width: null
           tile:
             layout: pane
@@ -238,6 +285,7 @@ tiles:
                 off_label: Disabled
                 off_color: rgb(255, 0, 0)
                 on_color: rgb(0, 255, 0)
+                default: true
   - title: VISUALIZATION
     allow_popout: true
     tile:
