@@ -33,9 +33,9 @@ BUS HEALTH
     DROPOUT                            -> genuinely controller-side
 
 Usage:
-    uv run dyno_test.py --dry-run
-    uv run dyno_test.py --tx-hz 20 --max-brake 6
-    uv run dyno_test.py --target-erpm 6000
+    python dyno_test.py --dry-run
+    python dyno_test.py --tx-hz 20 --max-brake 6
+    python dyno_test.py --target-erpm 6000
 
 Requires: pip install python-can rich gs_usb pyusb
 """
@@ -53,38 +53,66 @@ from datetime import datetime
 from pathlib import Path
 
 import can
-from blessed import Terminal
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from e_axle.constants import NODES as BASE_NODES
-from e_axle.constants import (
-    DUT_CHAIN,
-    DUT_ERPM_PER_DYNO_ERPM,
-    DUT_GEAR,
-    DUT_ID,
-    DUT_KT,
-    DUT_POLE_PAIRS,
-    DYNO_IDS,
-    DYNO_KT,
-    KT_BY_ID,
-)
+try:
+    import msvcrt  # Windows only
+    _PLATFORM = "windows"
+except ImportError:
+    import select
+    import termios
+    import tty
+    _PLATFORM = "posix"
 
-TERM = Terminal()
 HAVE_KEYBOARD = sys.stdin.isatty()
+_posix_saved_settings = None
 
+
+def enable_raw_mode() -> None:
+    """Put stdin into cbreak mode so single keys are readable without Enter. No-op on Windows."""
+    global _posix_saved_settings
+    if _PLATFORM != "posix" or not HAVE_KEYBOARD:
+        return
+    _posix_saved_settings = termios.tcgetattr(sys.stdin.fileno())
+    tty.setcbreak(sys.stdin.fileno())
+
+
+def restore_terminal() -> None:
+    """Restore stdin's settings saved by enable_raw_mode(). No-op on Windows or if never enabled."""
+    if _PLATFORM != "posix" or _posix_saved_settings is None:
+        return
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _posix_saved_settings)
 
 # --------------------------------------------------------------------------
 # Stand constants
 # --------------------------------------------------------------------------
 
+# MEASURED: DUT_erpm / dyno_erpm = 5.1973 (sd 0.0021) across all load levels.
+# With the dynos at 7 pole pairs that fixes the DUT chain at 36.38. Only this
+# PRODUCT is measurable from CAN data; the 4 / 9.095 split is provisional and
+# affects only motor-shaft-level figures.
+DUT_CHAIN = 36.38
+DUT_POLE_PAIRS = 4
+DUT_GEAR = DUT_CHAIN / DUT_POLE_PAIRS
+DUT_LAMBDA = 0.014423
+DUT_KT = 1.5 * DUT_POLE_PAIRS * DUT_LAMBDA
+
+DYNO_POLE_PAIRS = 7                             # physically counted, 12N14P
+DYNO_LAMBDA = 0.018148
+DYNO_KT = 1.5 * DYNO_POLE_PAIRS * DYNO_LAMBDA   # 0.1906 Nm/A
+
 NODES: dict[int, tuple[str, int, float, float]] = {
-    vid: (name, pole_pairs, gear, KT_BY_ID[vid])
-    for vid, (name, pole_pairs, gear) in BASE_NODES.items()
+    0: ("DUT", DUT_POLE_PAIRS, DUT_GEAR, DUT_KT),
+    1: ("DMC-L", DYNO_POLE_PAIRS, 1.0, DYNO_KT),
+    2: ("DMC-R", DYNO_POLE_PAIRS, 1.0, DYNO_KT),
 }
+
+DUT_ID = 0
+DYNO_IDS = (1, 2)
 
 # Frames older than this are not trusted for trip decisions. Long enough to
 # ride out a render hiccup, far shorter than the staleness trip.
@@ -399,19 +427,29 @@ def send_zero_all(bus: can.BusABC, h: BusHealth) -> None:
                                     data=payload, is_extended_id=True))
 
 
-ARROWS = {"KEY_UP": "UP", "KEY_DOWN": "DOWN",
-          "KEY_LEFT": "LEFT", "KEY_RIGHT": "RIGHT"}
-
-
 def poll_key() -> str | None:
     if not HAVE_KEYBOARD:
         return None
-    key = TERM.inkey(timeout=0)
-    if not key:
+    if _PLATFORM == "windows":
+        if not msvcrt.kbhit():
+            return None
+        ch = msvcrt.getch()
+        if ch in (b"\x00", b"\xe0"):
+            return {b"H": "UP", b"P": "DOWN",
+                    b"K": "LEFT", b"M": "RIGHT"}.get(msvcrt.getch())
+        return ch.decode("utf-8", "ignore").lower()
+
+    if not select.select([sys.stdin], [], [], 0)[0]:
         return None
-    if key.is_sequence:
-        return ARROWS.get(key.name)
-    return str(key).lower()
+    ch = sys.stdin.read(1)
+    if ch != "\x1b":  # ESC prefixes an ANSI arrow-key escape sequence
+        return ch.lower()
+    if not select.select([sys.stdin], [], [], 0)[0]:
+        return None
+    ch2 = sys.stdin.read(1)
+    if ch2 != "[" or not select.select([sys.stdin], [], [], 0)[0]:
+        return None
+    return {"A": "UP", "B": "DOWN", "C": "RIGHT", "D": "LEFT"}.get(sys.stdin.read(1))
 
 
 # --------------------------------------------------------------------------
@@ -836,8 +874,7 @@ def build_results_panel(nodes: dict[int, NodeState]) -> Panel:
         f"   (includes the ~198 W fixed driveline tare)",
         f"Half shafts L {dml.shaft_rpm:7.1f} RPM  R {dmr.shaft_rpm:7.1f} RPM  "
         f"spread {spread:5.1f} RPM ({spread_pct:5.1f}%, trip {SPREAD_TRIP_PCT:.0f}%)",
-        f"Chain check DUT/dyno ERPM ratio {chain:6.3f}  "
-        f"(expected {DUT_ERPM_PER_DYNO_ERPM:.3f})",
+        f"Chain check DUT/dyno ERPM ratio {chain:6.3f}  (expected 5.197)",
     ]
     style = "red" if spread_pct > SPREAD_TRIP_PCT * 0.6 else "dim"
     return Panel("\n".join(lines), title="Measured", border_style=style)
@@ -1072,15 +1109,16 @@ def main() -> None:
 
     bus = None
     health_fallback = BusHealth()
+    enable_raw_mode()
     try:
-        with TERM.cbreak():
-            bus = open_bus(args)
-            run(bus, seq, args.dry_run, log_path, args.tx_hz)
+        bus = open_bus(args)
+        run(bus, seq, args.dry_run, log_path, args.tx_hz)
     except KeyboardInterrupt:
         pass
     except Exception as e:  # noqa: BLE001
         print(f"\n{e}")
     finally:
+        restore_terminal()
         if bus is not None:
             if not args.dry_run:
                 for _ in range(5):
