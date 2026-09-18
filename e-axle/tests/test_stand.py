@@ -101,7 +101,7 @@ def test_motor_init_builds_channels_from_config():
     assert motor.name == "dut"
     assert motor.controller is cast(InstroMotorController, controller)
     assert motor.torque.maximum == 27.5
-    assert motor.speed.minimum == -3000.0
+    assert motor.velocity.minimum == -3000.0
     assert motor.current.maximum == 35.0
     assert motor.temperature.minimum == 0.0
     assert motor.temperature.maximum == 100.0
@@ -142,7 +142,7 @@ def test_motor_command_torque_mode_converts_to_current():
 def test_motor_command_speed_mode_sends_velocity():
     controller = _FakeController()
     motor = _make_motor(controller)
-    motor.speed.setpoint = 500.0
+    motor.velocity.setpoint = 500.0
     motor.control_mode.setpoint = "speed"
     motor.command()
     assert controller.set_velocity_calls == [500.0]
@@ -189,7 +189,7 @@ def test_motor_refresh_does_nothing_when_no_telemetry():
     motor = _make_motor(controller)
     motor.refresh()
     assert motor.current.measured is None
-    assert motor.speed.measured is None
+    assert motor.velocity.measured is None
     assert motor.temperature.measured is None
 
 
@@ -206,7 +206,7 @@ def test_motor_refresh_updates_present_fields():
     )
     motor.refresh()
     assert motor.current.measured == 7.0
-    assert motor.speed.measured == 1200.0
+    assert motor.velocity.measured == 1200.0
     assert motor.temperature.measured == 42.0
     assert motor.torque.measured == pytest.approx(7.0 * motor._effective_kt)
 
@@ -218,7 +218,7 @@ def test_motor_refresh_ignores_missing_fields():
         channel_data={"dut.velocity": [900.0]}, timestamps=[123]
     )
     motor.refresh()
-    assert motor.speed.measured == 900.0
+    assert motor.velocity.measured == 900.0
     assert motor.current.measured is None
     assert motor.temperature.measured is None
 
@@ -906,7 +906,7 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     )
     stand.stop()
     assert stand.dut.torque.setpoint == 0.0
-    assert stand.dut.speed.setpoint == 0.0
+    assert stand.dut.velocity.setpoint == 0.0
     assert stand.dut.current.setpoint == 0.0
 
 
@@ -916,14 +916,14 @@ def test_trip_stop_zeros_every_motor_and_disables_source_and_sink():
     stand._trip_stop_timeout_s = 0.05
     for motor in (stand.dut, stand.left_load, stand.right_load):
         motor.torque.setpoint = 10.0
-        motor.speed.setpoint = 500.0
+        motor.velocity.setpoint = 500.0
         motor.current.setpoint = 5.0
     stand.source.enabled.setpoint = True
     stand.sink.enabled.setpoint = True
     stand._trip_stop()
     for motor in (stand.dut, stand.left_load, stand.right_load):
         assert motor.torque.setpoint == motor.torque.default
-        assert motor.speed.setpoint == motor.speed.default
+        assert motor.velocity.setpoint == motor.velocity.default
         assert motor.current.setpoint == motor.current.default
     assert stand.source.enabled.setpoint is False
     assert stand.sink.enabled.setpoint is False
@@ -947,7 +947,7 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     )
     stand._trip_stop()
     assert stand.dut.torque.setpoint == 0.0
-    assert stand.dut.speed.setpoint == 0.0
+    assert stand.dut.velocity.setpoint == 0.0
     assert stand.dut.current.setpoint == 0.0
 
 

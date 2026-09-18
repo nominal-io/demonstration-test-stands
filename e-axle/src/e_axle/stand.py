@@ -58,7 +58,7 @@ class Motor(Component):
 
     controller: InstroMotorController
     torque: ControllableNumeric
-    speed: ControllableNumeric
+    velocity: ControllableNumeric
     current: ControllableNumeric
     control_mode: Controllable[Literal["torque", "speed", "current"]]
     temperature: Monitorable[float]
@@ -78,7 +78,7 @@ class Motor(Component):
             minimum=config.torque.minimum,
             maximum=config.torque.maximum,
         )
-        self.speed = ControllableNumeric(
+        self.velocity = ControllableNumeric(
             default=config.speed.default,
             minimum=config.speed.minimum,
             maximum=config.speed.maximum,
@@ -118,7 +118,7 @@ class Motor(Component):
             self.current.measured = current
             self.torque.measured = current * self._effective_kt
         if (key := f"{prefix}.velocity") in measurement.channel_data:
-            self.speed.measured = float(measurement.channel_data[key][-1])
+            self.velocity.measured = float(measurement.channel_data[key][-1])
         if (key := f"{prefix}.motor_temperature") in measurement.channel_data:
             self.temperature.measured = float(measurement.channel_data[key][-1])
 
@@ -130,14 +130,14 @@ class Motor(Component):
         if mode == "torque":
             self.controller.set_current(self.torque.setpoint / self._effective_kt)
         elif mode == "speed":
-            self.controller.set_velocity(self.speed.setpoint)
+            self.controller.set_velocity(self.velocity.setpoint)
         elif mode == "current":
             self.controller.set_current(self.current.setpoint)
 
     @property
     def active_channel(self) -> ControllableNumeric:
         """The channel currently being commanded, per this motor's control mode."""
-        return {"torque": self.torque, "speed": self.speed, "current": self.current}[
+        return {"torque": self.torque, "speed": self.velocity, "current": self.current}[
             self.control_mode.setpoint
         ]
 
@@ -471,7 +471,7 @@ class EAxleStand:
         self.state = EAxleStandState.STOPPING
         for motor in (self.dut, self.left_load, self.right_load):
             motor.torque.setpoint = 0.0
-            motor.speed.setpoint = 0.0
+            motor.velocity.setpoint = 0.0
             motor.current.setpoint = 0.0
             motor.command()
         ramped_down = self._wait_for_setpoint(
@@ -494,7 +494,7 @@ class EAxleStand:
             self.state = EAxleStandState.TRIP_STOPPING
         for motor in (self.dut, self.left_load, self.right_load):
             motor.torque.setpoint = 0.0
-            motor.speed.setpoint = 0.0
+            motor.velocity.setpoint = 0.0
             motor.current.setpoint = 0.0
             motor.command()
         self.source.enabled.setpoint = False
