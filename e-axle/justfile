@@ -20,6 +20,11 @@ format *ARGS:
 test *ARGS:
     uv run pytest tests app {{ARGS}}
 
-# Builds the wheel and places it within `app/wheels`
+# `uv sync`s, then builds the wheel and places it within `app/wheels`
 build *ARGS:
+    uv sync
     uv build --wheel -o app/wheels {{ARGS}}
+
+# Removes the `app/wheels` dir
+clean:
+    rm -rf app/wheels

@@ -17,7 +17,7 @@ from instro.unstable.transports.can import CanConfig, CanTransport
 from e_axle.stand import EAxleStand
 from e_axle.stand_config import EAxleStandConfig
 
-NETWORK_ADDRESS = "TCPIP0::192.168.0.3::5025::SOCKET"
+PSB_RESOURCE = "ASRL/dev/cu.usbmodem32710300041::INSTR"
 MOTOR_INTERVAL_S = 0.06  # VESC6 recommends >=10 Hz; its firmware times out a motor after 0.5s of silence
 PSB_INTERVAL_S = 0.5  # The PSB's SCPI interface cannot service the motor rate, and needs no resend to hold its setpoints
 
@@ -27,7 +27,7 @@ CORE_RID = "ri.catalog.cerulean-staging.dataset.247ceceb-39dc-4581-a128-a15ed478
 def build_stand(
     config: EAxleStandConfig | None = None,
     *,
-    network_address: str = NETWORK_ADDRESS,
+    psb_resource: str = PSB_RESOURCE,
     motor_interval_s: float = MOTOR_INTERVAL_S,
     psb_interval_s: float = PSB_INTERVAL_S,
 ) -> EAxleStand:
@@ -48,7 +48,7 @@ def build_stand(
     )
 
     # Source and sink are two quadrants of one physical bidirectional supply.
-    visa = VisaConfig(visa_resource=network_address, visa_backend="@py")
+    visa = VisaConfig(visa_resource=psb_resource, visa_backend="@py")
     psb = EAPSB10000Visa(visa)
     source_driver = InstroPSU("source", driver=psb.source, num_channels=1)
     sink_driver = InstroELoad("sink", driver=psb.sink)
