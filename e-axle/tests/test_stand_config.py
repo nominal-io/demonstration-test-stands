@@ -27,7 +27,9 @@ def test_nominal_config_initializes_every_stand_channel():
     left_load_torque = ControllableNumeric(
         **config.left_load_controller.torque.__dict__
     )
-    left_load_velocity = ControllableNumeric(**config.left_load_controller.velocity.__dict__)
+    left_load_velocity = ControllableNumeric(
+        **config.left_load_controller.velocity.__dict__
+    )
     left_load_current = ControllableNumeric(
         **config.left_load_controller.current.__dict__
     )

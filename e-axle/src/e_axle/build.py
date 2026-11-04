@@ -6,13 +6,13 @@ already-constructed drivers.
 """
 
 from instro.eload import InstroELoad
+from instro.lib.publishers.nominal_core import NominalCorePublisher
 from instro.lib.transports.visa import VisaConfig
 from instro.psu import InstroPSU
 from instro.psu.drivers.ea_psb10000 import EAPSB10000Visa
 from instro.unstable.motorcontroller import InstroMotorController
 from instro.unstable.motorcontroller.drivers.vesc_6 import VESC6
 from instro.unstable.transports.can import CanConfig, CanTransport
-from instro.lib.publishers.nominal_core import NominalCorePublisher
 
 from e_axle.stand import EAxleStand
 from e_axle.stand_config import EAxleStandConfig
@@ -22,6 +22,7 @@ MOTOR_INTERVAL_S = 0.06  # VESC6 recommends >=10 Hz; its firmware times out a mo
 PSB_INTERVAL_S = 0.5  # The PSB's SCPI interface cannot service the motor rate, and needs no resend to hold its setpoints
 
 CORE_RID = "ri.catalog.cerulean-staging.dataset.247ceceb-39dc-4581-a128-a15ed4788e38"
+
 
 def build_stand(
     config: EAxleStandConfig | None = None,

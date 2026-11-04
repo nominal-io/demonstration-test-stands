@@ -137,9 +137,11 @@ class Motor(Component):
     @property
     def active_channel(self) -> ControllableNumeric:
         """The channel currently being commanded, per this motor's control mode."""
-        return {"torque": self.torque, "velocity": self.velocity, "current": self.current}[
-            self.control_mode.setpoint
-        ]
+        return {
+            "torque": self.torque,
+            "velocity": self.velocity,
+            "current": self.current,
+        }[self.control_mode.setpoint]
 
 
 class Source(Component):

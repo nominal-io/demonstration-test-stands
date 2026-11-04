@@ -47,7 +47,9 @@ def main() -> None:
         stand.dut.velocity.setpoint = 1000.0  # mechanical RPM
         stand.right_load.control_mode.setpoint = "torque"
         stand.left_load.control_mode.setpoint = "torque"
-        logger.info(f"Entering run state. velocity setpoint: {stand.dut.velocity.setpoint}")
+        logger.info(
+            f"Entering run state. velocity setpoint: {stand.dut.velocity.setpoint}"
+        )
         stand.run()
         sleep(5)
         for torque in _sweep(

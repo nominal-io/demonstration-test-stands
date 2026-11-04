@@ -81,7 +81,9 @@ class _FakeController:
 def _dut_config() -> DutControllerConfig:
     return DutControllerConfig(
         torque=ControllableNumericConfig(default=0.0, minimum=-27.5, maximum=27.5),
-        velocity=ControllableNumericConfig(default=0.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(
+            default=0.0, minimum=-3000.0, maximum=3000.0
+        ),
         current=ControllableNumericConfig(default=0.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -969,7 +971,9 @@ def test_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand.state = EAxleStandState.RUNNING
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(
+            default=500.0, minimum=-3000.0, maximum=3000.0
+        ),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
@@ -1018,7 +1022,9 @@ def test_trip_stop_commands_zero_even_when_motor_default_is_nonzero():
     stand._trip_stop_timeout_s = 0.05
     nonzero_default_config = DutControllerConfig(
         torque=ControllableNumericConfig(default=5.0, minimum=-27.5, maximum=27.5),
-        velocity=ControllableNumericConfig(default=500.0, minimum=-3000.0, maximum=3000.0),
+        velocity=ControllableNumericConfig(
+            default=500.0, minimum=-3000.0, maximum=3000.0
+        ),
         current=ControllableNumericConfig(default=2.0, minimum=-35.0, maximum=35.0),
         temperature=MonitorableConfig(minimum=0.0, maximum=100.0),
     )
