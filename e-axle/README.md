@@ -7,7 +7,7 @@ Control software for a real, CAN-connected bench-scale regenerative dynamometer 
 
 ## Hardware being controlled
 
-- **`dut`**: the device-under-test motor controller (VESC6), torque/speed/current commanded.
+- **`dut`**: the device-under-test motor controller (VESC6), torque/velocity/current commanded.
 - **`left_load` / `right_load`**: two absorber motor controllers (VESC6) acting as regenerative brakes. Current-commanded only.
 - **`source`**: the source quadrant of a bidirectional EA PSB10000 supply. Bus voltage/current, output enable, and hardware OVP/OCP limits.
 - **`sink`**: the sink quadrant of the same physical unit, run in CV mode to absorb regen current at the held bus voltage.
@@ -25,7 +25,7 @@ See `reference/e-axle-dyno_user_manual_rev_1-0.md` for the full hardware design,
 A typical session:
 
 1. Construct `EAxleStand.from_drivers(config, ...)` and use it as a context manager. `with EAxleStand(config) as stand:` calls `open()`, which connects every instrument, powers the bus, and confirms all three motor controllers have booted, landing in `ARMED`. The plain constructor, `EAxleStand(config, ...)` takes pre-built `Motor`/`Source`/`Sink` objects and is *not* preferred over the aforementioned `EAxleStand.from_drivers(config, ...)` method. Both are provided for testing purposes.
-2. While `ARMED`, stage the test: set `control_mode` and the relevant `torque`/`speed`/`current` setpoint on `dut`/`left_load`/`right_load`. These writes never reach the hardware yet.
+2. While `ARMED`, stage the test: set `control_mode` and the relevant `torque`/`velocity`/`current` setpoint on `dut`/`left_load`/`right_load`. These writes never reach the hardware yet.
 3. Call `run()` to actually begin commanding. State moves to `RUNNING`, and the staged setpoints start being transmitted continuously.
 4. Adjust setpoints live while `RUNNING` to sweep through the test.
 5. Call `stop()` to ramp every motor back to zero and return to `ARMED`, ready to stage and run another test, or `disarm()`.
