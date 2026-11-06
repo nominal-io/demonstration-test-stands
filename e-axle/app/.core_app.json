@@ -1,0 +1,15 @@
+{
+  "app.connect": {
+    "workspaces": {
+      "ri.security.cerulean-staging.workspace.eb4b992b-c504-441e-8266-cce0b7397b8d": {
+        "app_rid": "ri.scout.cerulean-staging.connect-app.3f0deceb-0bde-40f4-bce2-a0c1d0fa7f32",
+        "last_bundled_files": [
+          "app.connect",
+          "procedure.py",
+          "stand_control.py",
+          "wheels"
+        ]
+      }
+    }
+  }
+}
