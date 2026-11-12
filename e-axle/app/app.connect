@@ -17,6 +17,10 @@ streaming:
     file_path: null
     streams: []
   channels:
+  - channel: procedure.phase
+  - channel: procedure.step
+  - channel: procedure.target_speed
+  - channel: procedure.target_torque
   - channel: stand.dut.current
   - channel: stand.dut.speed
   - channel: stand.dut.temperature
@@ -48,14 +52,298 @@ on_unload: null
 tiles:
 - layout: tabs
   tabs:
-  - title: CONTROL
+  - title: AUTO
     allow_popout: true
     tile:
       layout: grid
       rows:
       - height: null
         columns:
-        - width: null
+        - width: 0.75
+          tile:
+            layout: grid
+            rows:
+            - height: 0.42606178
+              columns:
+              - width: 0.17243129
+                tile:
+                  layout: pane
+                  id: bff625cb-769b-44a1-8d6c-5dc5f4185f3f
+                  title: WARM-UP
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: number
+                      id: proc-warmup-speed
+                      label: DUT Speed
+                      default: 2000.0
+                      min: 1.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-warmup-load
+                      label: Load Torque
+                      default: 0.1
+                      min: 0.0
+                      max: 3.8
+                      units: Nm
+                    - input: number
+                      id: proc-warmup-temperature
+                      label: Target Temperature
+                      default: 35.0
+                      min: 1.0
+                      max: 99.0
+                      units: °C
+                    - input: number
+                      id: proc-warmup-timeout
+                      label: Timeout
+                      default: 180.0
+                      min: 0.0
+                      units: s
+              - width: 0.17243129
+                tile:
+                  layout: pane
+                  id: 63b4541a-3bd7-4398-9ce9-a3ad62fa614b
+                  title: COOL-DOWN
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: number
+                      id: proc-cooldown-speed
+                      label: DUT Speed
+                      default: 300.0
+                      min: 0.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-cooldown-temperature
+                      label: Target Temperature
+                      default: 35.0
+                      min: 1.0
+                      max: 99.0
+                      units: °C
+                    - input: number
+                      id: proc-cooldown-timeout
+                      label: Timeout
+                      default: 180.0
+                      min: 0.0
+                      units: s
+            - height: 0.52799594
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 6b13a6fc-8ed4-41d6-9ef1-7c20f14dab6f
+                  title: SWEEP & REGEN
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: number
+                      id: proc-sweep-speed-start
+                      label: Sweep Start DUT Speed
+                      default: 500.0
+                      min: 0.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-sweep-speed-stop
+                      label: Sweep Stop DUT Speed
+                      default: 1500.0
+                      min: 0.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-sweep-speed-step
+                      label: Sweep DUT Speed Step
+                      default: 250.0
+                      min: 0.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-sweep-dwell
+                      label: Dwell per Step
+                      default: 10.0
+                      min: 0.0
+                      units: s
+                    - input: number
+                      id: proc-load-1
+                      label: Load Step 1
+                      default: 0.25
+                      min: 0.0
+                      max: 3.8
+                      units: Nm
+                    - input: number
+                      id: proc-load-2
+                      label: Load Step 2
+                      default: 0.75
+                      min: 0.0
+                      max: 3.8
+                      units: Nm
+                    - input: number
+                      id: proc-load-3
+                      label: Load Step 3
+                      default: 1.25
+                      min: 0.0
+                      max: 3.8
+                      units: Nm
+                    - display: separator
+                    - input: number
+                      id: proc-regen-speed
+                      label: Regen DUT Speed
+                      default: 1000.0
+                      min: 0.0
+                      max: 3000.0
+                      units: RPM
+                    - input: number
+                      id: proc-regen-torque
+                      label: Regen Load Torque
+                      default: 0.25
+                      min: 0.0
+                      max: 3.8
+                      units: Nm
+                    - input: number
+                      id: proc-regen-duration
+                      label: Regen Duration
+                      default: 10.0
+                      min: 0.0
+                      units: s
+                    - display: separator
+                    - input: number
+                      id: proc-speed-ramp
+                      label: DUT Speed Ramp Rate
+                      default: 200.0
+                      min: 0.0
+                      units: RPM/s
+                    - input: number
+                      id: proc-torque-ramp
+                      label: Load Torque Ramp Rate
+                      default: 0.5
+                      min: 0.0
+                      units: Nm/s
+                    - input: number
+                      id: proc-overspeed-margin
+                      label: Load Overspeed Margin
+                      default: 50.0
+                      min: 0.0
+                      max: 471.0
+                      units: RPM
+            - height: 0.5474667
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: c3d53a6b-205d-49e1-9fa4-ffeebc4a325e
+                  title: RUN
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - controls: script_table
+                    scripts:
+                    - label: Procedure
+                      path: procedure.py
+                      args: []
+                      max_log_lines: 10000
+                      id: procedure
+                    show_output_column: true
+                  - text: Start
+                    show_sigil: true
+                    size: big
+                    rounding: tight
+                    on_click_action:
+                    - _kind: message
+                      topic: procedure/start
+                  - text: Abort
+                    show_sigil: true
+                    size: big
+                    rounding: tight
+                    on_click_action:
+                    - _kind: message
+                      topic: procedure/abort
+            - height: 0.8349439
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 2351533e-1bc2-4176-b870-b58fde257db1
+                  title: Logs
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - display: logs
+                    script_id: procedure
+        - width: 0.75
+          tile:
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 747e91a5-0f87-40c1-9e1c-f33ece16e9d7
+                  title: Line Plot
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: stand
+                    channels:
+                    - dut.velocity
+                    colors:
+                    - rgb(255, 0, 0)
+                    secondary_axis:
+                      channels:
+                      - stand.left.torque
+                      - stand.right.torque
+                      label: Load Torque (Nm)
+                    legend_placement: bottom_left
+                    y_label: DUT Speed (RPM)
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 30s
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: e712ba4a-de22-4336-b0f2-7180f3b8ef5b
+                  title: TEMPERATURE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: stand
+                    channels:
+                    - dut.temperature
+                    - left.temperature
+                    - right.temperature
+                    colors:
+                    - rgb(255, 0, 0)
+                    - rgb(0, 255, 0)
+                    - rgb(0, 0, 255)
+                    legend_placement: bottom_left
+                    y_label: Temperature (C)
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 30s
+  - title: MANUAL
+    allow_popout: true
+    tile:
+      layout: grid
+      rows:
+      - height: null
+        columns:
+        - width: 0.75
           tile:
             layout: grid
             rows:
@@ -199,7 +487,7 @@ tiles:
                       path: stand_control.py
                       args: []
                       max_log_lines: 10000
-                      id: control
+                      id: manual
                     show_output_column: true
             - height: 1.0181961
               columns:
@@ -212,24 +500,66 @@ tiles:
                   should_fill: true
                   elements:
                   - display: logs
-                    script_id: control
-        - width: null
+                    script_id: manual
+        - width: 0.75
           tile:
-            layout: pane
-            id: 6a508a3e-c7ff-4bf0-aa5c-ffcd238b3a48
-            title: Line Plot
-            direction: vertical
-            should_fill: true
-            elements:
-            - plot: line
-              stream_id: stand
-              colors: []
-              legend_placement: bottom_left
-              x_format: timestamp
-              x_time_display: Local
-              x_scale: linear
-              y_scale: linear
-              time_window: 30s
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: cdc6a2da-b933-4b1c-8d11-531ddc0fcce0
+                  title: Line Plot
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: stand
+                    channels:
+                    - dut.velocity
+                    colors:
+                    - rgb(255, 0, 0)
+                    secondary_axis:
+                      channels:
+                      - stand.left.torque
+                      - stand.right.torque
+                      label: Load Torque (Nm)
+                    legend_placement: bottom_left
+                    y_label: DUT Speed (RPM)
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 30s
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 0c681619-91e9-4bc7-9f05-67075bb43c8e
+                  title: TEMPERATURE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: stand
+                    channels:
+                    - dut.temperature
+                    - left.temperature
+                    - right.temperature
+                    colors:
+                    - rgb(255, 0, 0)
+                    - rgb(0, 255, 0)
+                    - rgb(0, 0, 255)
+                    legend_placement: bottom_left
+                    y_label: Temperature (C)
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 30s
 left_panel: null
 right_panel: null
 bottom_panel: null
