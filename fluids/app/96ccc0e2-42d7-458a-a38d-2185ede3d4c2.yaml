@@ -1,0 +1,681 @@
+nodes:
+  1ef0ce5e-a38f-45d7-98a6-3756b00a8934:
+    title: Linear actuator
+    position:
+      x: -620.0
+      y: 160.0
+    size:
+      height: 100.0
+    type: !symbol
+      id: hydraulic-actuator
+      angle: 180.0
+  1fa243ef-af29-47b0-9095-422dce568a2d:
+    title: Mass flow meter, fm_1
+    position:
+      x: -710.0
+      y: -70.0
+    type: !flow_meter
+      channel: fluids.fm_1.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: NoFlow
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Flowing
+      - condition:
+          kind: equal
+          value: 2.0
+        value: ReverseFlow
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Fault
+  fm_1-value:
+    title: fm_1 (L/min)
+    position:
+      x: -710.0
+      y: 0.0
+    type: !value
+      stream: fluids
+      channel: fm_1
+  ca087444-718b-4f09-afc1-112fbd07cd81:
+    title: Silencer
+    position:
+      x: -550.0
+      y: -70.0
+    size:
+      width: 100.0
+      height: 50.0
+    type: !symbol
+      id: iso10628-2033
+      text:
+        content: m_3
+  355e7e2b-8a2c-40e2-b63f-c3e8c213e74f:
+    title: Vent
+    position:
+      x: -370.0
+      y: -70.0
+    size:
+      width: 50.0
+      height: 100.0
+    type: !symbol
+      id: iso10628-2039
+      angle: 90.0
+  b187e72e-5e18-4612-befa-5677ec6fc620:
+    title: Proportional valve, v_2
+    position:
+      x: -1020.0
+      y: -70.40625
+    type: !gate_valve
+      channel: fluids.v_2.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Closed
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Open
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Partial
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Transitioning
+      - condition:
+          kind: equal
+          value: 4.0
+        value: Fault
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        value: $v2-setpoint
+        action: set
+        target: v_2
+  205e8ae4-baa8-4f65-9696-109bcc1e9ef9:
+    title: End Effector
+    position:
+      x: -460.0
+      y: 160.0
+    size:
+      width: 100.0
+      height: 100.0
+    type: !shape
+      ty: !Square
+        corner_radius:
+          nw: 0
+          ne: 0
+          sw: 0
+          se: 0
+  9d3954da-7d42-474e-838b-caab9c33770a:
+    title: Orifice
+    position:
+      x: -570.21875
+      y: 410.0
+    size:
+      width: 100.0
+    type: !symbol
+      id: valve-variable-orifice
+      angle: 90.0
+  d75bf2fa-60e1-4882-aac1-70dbdb92481f:
+    title: Vessel iso, v_5 (NO)
+    position:
+      x: -890.0
+      y: 410.0
+    type: !gate_valve
+      channel: fluids.v_5.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Closed
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Open
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Partial
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Transitioning
+      - condition:
+          kind: equal
+          value: 4.0
+        value: Fault
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        action: toggle
+        target: v_5
+  d874ff46-5b44-4141-82f5-c109d2d96247:
+    title: Vent
+    position:
+      x: -450.0
+      y: 410.0
+    size:
+      width: 50.0
+      height: 100.0
+    type: !symbol
+      id: iso10628-2039
+      angle: 90.0
+  adaab78a-d6c5-42ee-ab3c-2a682fa1e3ed:
+    position:
+      x: -790.0
+      y: 410.0
+    type: !join
+      size: 8.0
+  a3b15e46-7ac2-4c3f-b6ab-be002c48636e:
+    title: Vessel Pressure
+    position:
+      x: -690.0
+      y: 409.65625
+    size:
+      width: 100.0
+    type: !symbol
+      id: vessel-pressure
+  964bd210-9ffd-4bae-84d5-a373f6b04e39:
+    title: Vessel, p_2 (psig)
+    position:
+      x: -790.0
+      y: 320.0
+    type: !value
+      stream: fluids
+      channel: p_2
+  p_2-leak-rate:
+    title: Leak rate (psi/min)
+    position:
+      x: -690.0
+      y: 500.0
+    type: !value
+      stream: fluids
+      channel: p_2.leak_rate
+  2bda1a28-686a-4c8b-9cc1-2b59739ac1f3:
+    title: Valve 3way
+    position:
+      x: -890.0
+      y: 160.0
+    size:
+      height: 100.0
+    anchors:
+      top: []
+      bottom: []
+      left: []
+      right:
+      - x: 1.0
+        y: 0.25
+      - x: 1.0
+        y: 0.75
+    type: !symbol
+      id: valve-3way
+      text:
+        content: v_3
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        action: toggle
+        target: v_3
+  951a6ff2-5b73-4c74-89c0-1ef53e725dcf:
+    title: Retracted, sw_1
+    position:
+      x: -730.0
+      y: 80.0
+    type: !status_light
+      channel: fluids.sw_1.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Off
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Ok
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Warning
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Fault
+  fbf508b4-f8ed-47c5-92c2-ea2a9ca8b4b2:
+    title: Extended, sw_2
+    position:
+      x: -550.0
+      y: 80.0
+    type: !status_light
+      channel: fluids.sw_2.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Off
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Ok
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Warning
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Fault
+  68ce8eaf-9406-467c-92b8-8682f97fedff:
+    position:
+      x: -1160.0
+      y: 70.0
+    type: !join
+      size: 8.0
+  b19c2b9f-9a2e-4a4c-ae63-1cf772786690:
+    position:
+      x: -1160.0
+      y: -70.0
+    type: !join
+      size: 8.0
+  de16fb87-101e-43fa-9936-3e5c27afc929:
+    title: Compressor, pump_1
+    position:
+      x: -1670.0
+      y: -310.0
+    type: !compressor
+      channel: fluids.pump_1.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Off
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Running
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Fault
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        action: toggle
+        target: supply
+  1142b5f6-ea20-45b6-8935-8ac33394ff1f:
+    title: Accumulator
+    position:
+      x: -1520.0
+      y: -310.34375
+    size:
+      width: 100.0
+    type: !symbol
+      id: vessel-pressure
+  a87651c8-cb35-4213-b124-a821d7e3790c:
+    title: Supply, p_1 (psig)
+    position:
+      x: -1070.0
+      y: -310.0
+    type: !value
+      stream: fluids
+      channel: p_1
+  3355ec10-0e9e-4aec-90e2-a5c4d9fd855c:
+    position:
+      x: -1160.0
+      y: -310.0
+    type: !join
+      size: 8.0
+  9b09de3b-aa39-46cf-9156-2289d1558ea4:
+    title: Safety valve, 100 psi
+    position:
+      x: -1260.0
+      y: -500.40625
+    size:
+      width: 50.0
+    type: !symbol
+      id: iso10628-x2125
+      text:
+        content: rv_1
+  e1d856d4-87c1-44ba-afa1-3151896e2452:
+    title: Silencer
+    position:
+      x: -1020.0
+      y: -500.03125
+    size:
+      width: 100.0
+      height: 50.0
+    type: !symbol
+      id: iso10628-2033
+      text:
+        content: m_1
+  6ae0546c-4f90-4b4f-b72d-0f18dacf1167:
+    title: Vent
+    position:
+      x: -870.0
+      y: -500.0
+    size:
+      width: 50.0
+      height: 100.0
+    type: !symbol
+      id: iso10628-2039
+      angle: 90.0
+  dad98d5e-8119-4d39-83f5-f3024d014849:
+    position:
+      x: -1260.0
+      y: -310.0
+    type: !join
+      size: 8.0
+  81a68e6e-15b2-46f6-9150-4dddc7836186:
+    title: Main vent, v_1 (NO)
+    position:
+      x: -1160.0
+      y: -410.0
+    type: !gate_valve
+      channel: fluids.v_1.state
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Closed
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Open
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Partial
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Transitioning
+      - condition:
+          kind: equal
+          value: 4.0
+        value: Fault
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        action: toggle
+        target: v_1
+  41fd3ff6-4c60-42a9-8694-62660b6f7897:
+    title: E-P regulator, pr_2
+    position:
+      x: -1030.0
+      y: 409.6875
+    size:
+      width: 100.0
+    type: !symbol
+      id: iso10628-516
+      text:
+        content: pr_2
+      on_click_action:
+      - _kind: message
+        topic: script/fluids/cmd
+        value: $pr2-setpoint
+        action: set
+        target: pr_2
+  stand-status:
+    title: Stand status
+    position:
+      x: -1810.0
+      y: -500.0
+    type: !status_light
+      channel: fluids.stand.status
+      states:
+      - condition:
+          kind: equal
+          value: 0.0
+        value: Off
+      - condition:
+          kind: equal
+          value: 1.0
+        value: Ok
+      - condition:
+          kind: equal
+          value: 2.0
+        value: Warning
+      - condition:
+          kind: equal
+          value: 3.0
+        value: Fault
+  684d35a9-d701-407a-a7b8-67480e791fcc:
+    title: Air Filter
+    position:
+      x: -1810.0
+      y: -310.15625
+    size:
+      width: 50.0
+    type: !symbol
+      id: filter-air
+  e5fd7770-e61c-441c-9a6b-b454d17195fa:
+    title: Bottle
+    position:
+      x: -1430.0
+      y: -60.0
+    size:
+      width: 50.0
+      height: 100.0
+    type: !symbol
+      id: iso10628-2039
+      text:
+        content: Drain
+      angle: 90.0
+  add72656-a952-47a8-a96a-096a4bd36c69:
+    title: Condensate drain (manual)
+    position:
+      x: -1520.0
+      y: -170.0
+    size:
+      width: 100.0
+    type: !symbol
+      id: valve-manual
+      angle: 90.0
+  97c67a9a-1b72-4a21-93dd-6fb43530ed8a:
+    title: Float gauge (visual)
+    position:
+      x: -860.0
+      y: -70.40625
+    size:
+      width: 50.0
+    type: !symbol
+      id: iso10628-2036
+  526a1292-5e5e-4018-8c96-74943c75c31a:
+    title: Regulator, pr_1 (~85 psi, manual)
+    position:
+      x: -1370.0
+      y: -310.3125
+    size:
+      width: 100.0
+    type: !symbol
+      id: iso10628-516
+      text:
+        content: pr_1
+edges:
+- from:
+    node: 1fa243ef-af29-47b0-9095-422dce568a2d
+    direction: right
+  to:
+    node: ca087444-718b-4f09-afc1-112fbd07cd81
+    direction: left
+- from:
+    node: ca087444-718b-4f09-afc1-112fbd07cd81
+    direction: right
+  to:
+    node: 355e7e2b-8a2c-40e2-b63f-c3e8c213e74f
+    direction: left
+- from:
+    node: 9d3954da-7d42-474e-838b-caab9c33770a
+    direction: left
+  to:
+    node: a3b15e46-7ac2-4c3f-b6ab-be002c48636e
+    direction: right
+- from:
+    node: 964bd210-9ffd-4bae-84d5-a373f6b04e39
+    direction: down
+  to:
+    node: adaab78a-d6c5-42ee-ab3c-2a682fa1e3ed
+    direction: up
+- from:
+    node: 2bda1a28-686a-4c8b-9cc1-2b59739ac1f3
+    direction: right
+  to:
+    node: 1ef0ce5e-a38f-45d7-98a6-3756b00a8934
+    direction: left
+- from:
+    node: b187e72e-5e18-4612-befa-5677ec6fc620
+    direction: left
+  to:
+    node: b19c2b9f-9a2e-4a4c-ae63-1cf772786690
+    direction: right
+- from:
+    node: b19c2b9f-9a2e-4a4c-ae63-1cf772786690
+    direction: down
+  to:
+    node: 68ce8eaf-9406-467c-92b8-8682f97fedff
+    direction: up
+- from:
+    node: 3355ec10-0e9e-4aec-90e2-a5c4d9fd855c
+    direction: left
+  to:
+    node: dad98d5e-8119-4d39-83f5-f3024d014849
+    direction: right
+- from:
+    node: 6ae0546c-4f90-4b4f-b72d-0f18dacf1167
+    direction: left
+  to:
+    node: e1d856d4-87c1-44ba-afa1-3151896e2452
+    direction: right
+- from:
+    node: 3355ec10-0e9e-4aec-90e2-a5c4d9fd855c
+    direction: down
+  to:
+    node: b19c2b9f-9a2e-4a4c-ae63-1cf772786690
+    direction: up
+- from:
+    node: de16fb87-101e-43fa-9936-3e5c27afc929
+    direction: right
+  to:
+    node: 1142b5f6-ea20-45b6-8935-8ac33394ff1f
+    direction: left
+- from:
+    node: dad98d5e-8119-4d39-83f5-f3024d014849
+    direction: up
+  to:
+    node: 9b09de3b-aa39-46cf-9156-2289d1558ea4
+    direction: down
+- from:
+    node: 3355ec10-0e9e-4aec-90e2-a5c4d9fd855c
+    direction: up
+  to:
+    node: 81a68e6e-15b2-46f6-9150-4dddc7836186
+    direction: down
+- from:
+    node: 3355ec10-0e9e-4aec-90e2-a5c4d9fd855c
+    direction: right
+  to:
+    node: a87651c8-cb35-4213-b124-a821d7e3790c
+    direction: left
+- from:
+    node: e1d856d4-87c1-44ba-afa1-3151896e2452
+    direction: left
+  to:
+    node: 81a68e6e-15b2-46f6-9150-4dddc7836186
+    direction: up
+- from:
+    node: d874ff46-5b44-4141-82f5-c109d2d96247
+    direction: left
+  to:
+    node: 9d3954da-7d42-474e-838b-caab9c33770a
+    direction: right
+- from:
+    node: 68ce8eaf-9406-467c-92b8-8682f97fedff
+    direction: down
+  to:
+    node: 41fd3ff6-4c60-42a9-8694-62660b6f7897
+    direction: left
+- from:
+    node: 41fd3ff6-4c60-42a9-8694-62660b6f7897
+    direction: right
+  to:
+    node: d75bf2fa-60e1-4882-aac1-70dbdb92481f
+    direction: left
+- from:
+    node: d75bf2fa-60e1-4882-aac1-70dbdb92481f
+    direction: right
+  to:
+    node: adaab78a-d6c5-42ee-ab3c-2a682fa1e3ed
+    direction: left
+- from:
+    node: adaab78a-d6c5-42ee-ab3c-2a682fa1e3ed
+    direction: right
+  to:
+    node: a3b15e46-7ac2-4c3f-b6ab-be002c48636e
+    direction: left
+- from:
+    node: 2bda1a28-686a-4c8b-9cc1-2b59739ac1f3
+    direction: right
+  to:
+    node: 1ef0ce5e-a38f-45d7-98a6-3756b00a8934
+    direction: down
+- from:
+    node: 684d35a9-d701-407a-a7b8-67480e791fcc
+    direction: right
+  to:
+    node: de16fb87-101e-43fa-9936-3e5c27afc929
+    direction: left
+- from:
+    node: add72656-a952-47a8-a96a-096a4bd36c69
+    direction: down
+  to:
+    node: e5fd7770-e61c-441c-9a6b-b454d17195fa
+    direction: left
+- from:
+    node: add72656-a952-47a8-a96a-096a4bd36c69
+    direction: up
+  to:
+    node: 1142b5f6-ea20-45b6-8935-8ac33394ff1f
+    direction: down
+- from:
+    node: b187e72e-5e18-4612-befa-5677ec6fc620
+    direction: right
+  to:
+    node: 97c67a9a-1b72-4a21-93dd-6fb43530ed8a
+    direction: down
+- from:
+    node: 97c67a9a-1b72-4a21-93dd-6fb43530ed8a
+    direction: up
+  to:
+    node: 1fa243ef-af29-47b0-9095-422dce568a2d
+    direction: left
+- from:
+    node: 526a1292-5e5e-4018-8c96-74943c75c31a
+    direction: right
+  to:
+    node: dad98d5e-8119-4d39-83f5-f3024d014849
+    direction: left
+- from:
+    node: 526a1292-5e5e-4018-8c96-74943c75c31a
+    direction: left
+  to:
+    node: 1142b5f6-ea20-45b6-8935-8ac33394ff1f
+    direction: right
+- from:
+    node: 68ce8eaf-9406-467c-92b8-8682f97fedff
+    direction: right
+  to:
+    node: 2bda1a28-686a-4c8b-9cc1-2b59739ac1f3
+    direction: up
+viewport:
+  min:
+    x: -2287.6716
+    y: -664.84375
+  max:
+    x: 132.67163
+    y: 619.53125

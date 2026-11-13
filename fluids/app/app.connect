@@ -1,0 +1,325 @@
+title: FLUIDS PANEL
+window_title: null
+logo_path: null
+timeline:
+  show: false
+  display: relative
+  pixels_per_tick: 0.0
+  milestones: []
+streaming:
+  buffer_size: 5000
+  timeline: null
+  playback_speed: null
+  window: null
+  persistence: []
+  channels:
+  - channel: fluids.actuator.state
+  - channel: fluids.fm_1
+    unit: L/min
+  - channel: fluids.fm_1.state
+  - channel: fluids.p_1
+    unit: psig
+  - channel: fluids.p_2
+    unit: psig
+  - channel: fluids.p_2.leak_rate
+    unit: psi/min
+  - channel: fluids.pr_2
+    unit: psig
+  - channel: fluids.pump_1.state
+  - channel: fluids.stand.state
+  - channel: fluids.stand.status
+  - channel: fluids.sw_1.state
+  - channel: fluids.sw_2.state
+  - channel: fluids.v_1.state
+  - channel: fluids.v_2
+    unit: L/min
+  - channel: fluids.v_2.state
+  - channel: fluids.v_5.state
+python:
+  packages:
+  - fluids-panel
+  wheelhouse: wheels
+on_load: null
+on_unload: null
+tiles:
+- layout: tabs
+  tabs:
+  - title: SIMULATOR
+    allow_popout: true
+    tile:
+      layout: grid
+      rows:
+      - height: null
+        columns:
+        - width: 0.72
+          tile:
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: d919678c-fe71-48b0-9fc7-efbabb7c60a0
+                  title: P&ID
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - id: 96ccc0e2-42d7-458a-a38d-2185ede3d4c2
+                    canvas: 96ccc0e2-42d7-458a-a38d-2185ede3d4c2.yaml
+            - height: 0.5
+              columns:
+              - width: 0.66667175
+                tile:
+                  layout: pane
+                  id: e168f691-35e0-4e9e-ab37-90022f4e9cdc
+                  title: CONTROL
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - display: banner
+                      value:
+                        value_id: stand-status
+                      font_size: 14.0
+                    - input: number
+                      id: v2-setpoint
+                      label: Flow setpoint (v_2)
+                      default: 7.8
+                      min: 0.0
+                      max: 15.6
+                      units: L/min
+                    - input: number
+                      id: pr2-setpoint
+                      label: Vessel pressure setpoint (pr_2)
+                      default: 72.5
+                      min: 0.0
+                      max: 145.0
+                      units: psig
+                    - id: pressurize
+                      text: Pressurize
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        action: pressurize
+                    - id: vent
+                      text: Vent
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        action: vent
+                    - id: abort
+                      text: Abort
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        action: abort
+                    - id: reset
+                      text: Reset trip
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        action: reset
+              - width: 0.66667175
+                tile:
+                  layout: pane
+                  id: b1fe418e-adc3-4d98-817f-17f2a4a2a4a2
+                  title: SEQUENCES
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - id: sequence-startup
+                      text: Startup
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        name: startup
+                        action: sequence
+                    - id: sequence-flow
+                      text: Flow (v_2 setpoint)
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        lpm: $v2-setpoint
+                        action: sequence
+                        name: flow
+                    - id: sequence-actuate
+                      text: Actuate
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        name: actuate
+                        action: sequence
+                    - id: sequence-proof-leak
+                      text: Proof & leak (pr_2 setpoint)
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        psig: $pr2-setpoint
+                        action: sequence
+                        name: proof_leak
+                    - id: sequence-shutdown
+                      text: Shutdown
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids/cmd
+                        name: shutdown
+                        action: sequence
+              - width: 0.6666565
+                tile:
+                  layout: pane
+                  id: 782e350a-6c50-4f03-a871-9e467e953c7c
+                  title: SIMULATION
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - input: toggle_switch
+                      id: sim-noise
+                      label: Sensor noise
+                    - display: separator
+                    - input: toggle_switch
+                      id: sim-estop
+                      label: E-stop pressed
+                    - input: toggle_switch
+                      id: sim-p1-wire
+                      label: p_1 wire broken
+                    - input: toggle_switch
+                      id: sim-actuator-jammed
+                      label: Actuator jammed
+                    - input: toggle_switch
+                      id: sim-big-leak
+                      label: Big vessel leak
+        - width: 0.28
+          tile:
+            layout: grid
+            rows:
+            - height: 1.0
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: b9b8b7d8-d52d-4f2a-ac28-00ea4e0fca6f
+                  title: PRESSURE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: fluids
+                    channels:
+                    - p_1
+                    - p_2
+                    - pr_2
+                    colors: []
+                    legend_placement: bottom_left
+                    y_label: Pressure (psig), pr_2 is setpoint
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 2m
+            - height: 1.0
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: e22d9392-64a7-4af2-bef1-9e94b85c5b62
+                  title: FLOW
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: fluids
+                    channels:
+                    - fm_1
+                    - v_2
+                    colors: []
+                    legend_placement: bottom_left
+                    y_label: Flow (L/min), v_2 is setpoint
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 2m
+            - height: 0.5877775
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 5dd10847-c16e-4346-8f3a-1c2a434c71cf
+                  title: Script Controls
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - controls: script_table
+                    scripts:
+                    - label: Stand Control
+                      path: stand_control.py
+                      args:
+                      - --backend
+                      - mock
+                      max_log_lines: 10000
+                      id: control
+                    show_output_column: true
+            - height: 1.4636929
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 37680cde-50ff-443b-95ae-9c09735647f7
+                  title: Logs
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - display: logs
+                    script_id: control
+  - title: SIMULATOR GUIDE
+    allow_popout: true
+    tile:
+      layout: pane
+      id: abd8248c-ee9b-444c-827c-df6eb0bb5539
+      title: HOW TO
+      direction: vertical
+      should_fill: true
+      elements:
+      - display: markdown
+        path: controls.md
+left_panel: null
+right_panel: null
+bottom_panel: null
+scene: {}
+poster: null
+prompt_windows: []
+mcap_path: null
+conditionals: []
