@@ -11,6 +11,7 @@ APP = Path(__file__).parents[1] / "app"
 # Each tab's P&ID canvas, by the backend its tab runs.
 CANVASES = {
     "mock": APP / "96ccc0e2-42d7-458a-a38d-2185ede3d4c2.yaml",
+    "daq": APP / "0fbfc996-4451-45c5-ba3c-efbbf67cc42d.yaml",
 }
 
 

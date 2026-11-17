@@ -42,6 +42,14 @@ def check_outputs(outputs: Mapping[str, RawValue]) -> None:
             )
 
 
+class BackendFault(RuntimeError):
+    """`read()` can't vouch for the inputs right now, e.g. the DAQ stopped reporting.
+
+    The stand trips on it rather than acting on bad readings. Keep the message free of changing
+    details (counts, durations) so the trip latches once instead of once per tick.
+    """
+
+
 class Backend(ABC):
     """Raw access to the panel's DAQ channels."""
 
@@ -55,7 +63,10 @@ class Backend(ABC):
 
     @abstractmethod
     def read(self) -> dict[str, RawValue]:
-        """Sample every input: digital inputs as bools, analog inputs as mA."""
+        """Sample every input: digital inputs as bools, analog inputs as mA.
+
+        Raises BackendFault if the inputs can't be trusted.
+        """
 
     @abstractmethod
     def write(self, outputs: Mapping[str, RawValue]) -> None:

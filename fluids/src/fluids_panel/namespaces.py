@@ -28,4 +28,9 @@ NAMESPACES = {
         command_topic="script/fluids/cmd",
         status_value_id="stand-status",
     ),
+    "daq": Namespace(
+        stream_id="fluids_hw",
+        command_topic="script/fluids_hw/cmd",
+        status_value_id="hw-stand-status",
+    ),
 }

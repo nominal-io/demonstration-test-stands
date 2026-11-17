@@ -35,6 +35,33 @@ streaming:
     unit: L/min
   - channel: fluids.v_2.state
   - channel: fluids.v_5.state
+  - channel: fluids_daq_engine.fm_1
+  - channel: fluids_daq_engine.p_1
+  - channel: fluids_daq_engine.p_2
+  - channel: fluids_daq_engine.sw_1
+  - channel: fluids_daq_engine.sw_2
+  - channel: fluids_hw.actuator.state
+  - channel: fluids_hw.fm_1
+    unit: L/min
+  - channel: fluids_hw.fm_1.state
+  - channel: fluids_hw.p_1
+    unit: psig
+  - channel: fluids_hw.p_2
+    unit: psig
+  - channel: fluids_hw.p_2.leak_rate
+    unit: psi/min
+  - channel: fluids_hw.pr_2
+    unit: psig
+  - channel: fluids_hw.pump_1.state
+  - channel: fluids_hw.stand.state
+  - channel: fluids_hw.stand.status
+  - channel: fluids_hw.sw_1.state
+  - channel: fluids_hw.sw_2.state
+  - channel: fluids_hw.v_1.state
+  - channel: fluids_hw.v_2
+    unit: L/min
+  - channel: fluids_hw.v_2.state
+  - channel: fluids_hw.v_5.state
 python:
   packages:
   - fluids-panel
@@ -44,6 +71,240 @@ on_unload: null
 tiles:
 - layout: tabs
   tabs:
+  - title: HARDWARE
+    allow_popout: true
+    tile:
+      layout: grid
+      rows:
+      - height: null
+        columns:
+        - width: 0.72
+          tile:
+            layout: grid
+            rows:
+            - height: null
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: fea92322-1261-4e33-8fc2-f8b8effe468a
+                  title: P&ID
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - id: 0fbfc996-4451-45c5-ba3c-efbbf67cc42d
+                    canvas: 0fbfc996-4451-45c5-ba3c-efbbf67cc42d.yaml
+            - height: 0.5
+              columns:
+              - width: 0.66667175
+                tile:
+                  layout: pane
+                  id: d9367b97-b4fa-40de-ba95-54d0557371b1
+                  title: CONTROL
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - display: banner
+                      value:
+                        value_id: hw-stand-status
+                      font_size: 14.0
+                    - input: number
+                      id: hw-v2-setpoint
+                      label: Flow setpoint (v_2)
+                      default: 12.0
+                      min: 10.0
+                      max: 15.6
+                      units: L/min
+                    - input: number
+                      id: hw-pr2-setpoint
+                      label: Vessel pressure setpoint (pr_2)
+                      default: 72.5
+                      min: 0.0
+                      max: 145.0
+                      units: psig
+                    - id: hw-pressurize
+                      text: Pressurize
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: pressurize
+                    - id: hw-vent
+                      text: Vent
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: vent
+                    - id: hw-abort
+                      text: Abort
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: abort
+                    - id: hw-reset
+                      text: Reset trip
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: reset
+              - width: 0.66667175
+                tile:
+                  layout: pane
+                  id: e4194823-a601-4577-aaf0-3ade0dde60c1
+                  title: SEQUENCES
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - spacing: normal
+                    inputs:
+                    - id: hw-sequence-startup
+                      text: Startup
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        name: startup
+                        action: sequence
+                    - id: hw-sequence-flow
+                      text: Flow (v_2 setpoint)
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: sequence
+                        name: flow
+                        lpm: $hw-v2-setpoint
+                    - id: hw-sequence-actuate
+                      text: Actuate
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        name: actuate
+                        action: sequence
+                    - id: hw-sequence-proof-leak
+                      text: Proof & leak (pr_2 setpoint)
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        action: sequence
+                        name: proof_leak
+                        psig: $hw-pr2-setpoint
+                    - id: hw-sequence-shutdown
+                      text: Shutdown
+                      show_sigil: true
+                      size: normal
+                      rounding: tight
+                      on_click_action:
+                      - _kind: message
+                        topic: script/fluids_hw/cmd
+                        name: shutdown
+                        action: sequence
+        - width: 0.28
+          tile:
+            layout: grid
+            rows:
+            - height: 1.0
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 96adc994-247c-4393-bb68-e4915a106f00
+                  title: PRESSURE
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: fluids_hw
+                    channels:
+                    - p_1
+                    - p_2
+                    - pr_2
+                    colors: []
+                    legend_placement: bottom_left
+                    y_label: Pressure (psig), pr_2 is setpoint
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 2m
+            - height: 1.0
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: 80f792ec-e1cd-4c02-a3f6-45b516f604a6
+                  title: FLOW
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - plot: line
+                    stream_id: fluids_hw
+                    channels:
+                    - fm_1
+                    - v_2
+                    colors: []
+                    legend_placement: bottom_left
+                    y_label: Flow (L/min), v_2 is setpoint
+                    x_format: timestamp
+                    x_time_display: Local
+                    x_scale: linear
+                    y_scale: linear
+                    time_window: 2m
+            - height: 0.5877775
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: fad6c555-638e-4652-8aeb-e44602c8d9e4
+                  title: Script Controls
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - controls: script_table
+                    scripts:
+                    - label: Stand Control (cDAQ)
+                      path: stand_control.py
+                      args:
+                      - --backend
+                      - daq
+                      max_log_lines: 10000
+                      id: hw-control
+                    show_output_column: false
+            - height: 1.4636929
+              columns:
+              - width: null
+                tile:
+                  layout: pane
+                  id: edb99857-b874-47d2-bcdd-1cdab7043a95
+                  title: Logs
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - display: logs
+                    script_id: hw-control
   - title: SIMULATOR
     allow_popout: true
     tile:
@@ -161,9 +422,9 @@ tiles:
                       on_click_action:
                       - _kind: message
                         topic: script/fluids/cmd
-                        lpm: $v2-setpoint
                         action: sequence
                         name: flow
+                        lpm: $v2-setpoint
                     - id: sequence-actuate
                       text: Actuate
                       show_sigil: true
@@ -182,9 +443,9 @@ tiles:
                       on_click_action:
                       - _kind: message
                         topic: script/fluids/cmd
-                        psig: $pr2-setpoint
                         action: sequence
                         name: proof_leak
+                        psig: $pr2-setpoint
                     - id: sequence-shutdown
                       text: Shutdown
                       show_sigil: true
@@ -322,4 +583,7 @@ scene: {}
 poster: null
 prompt_windows: []
 mcap_path: null
+default_device_configs:
+  NI-DAQmx:
+    cDAQ1: fluids_daq.ni-daqmx.json
 conditionals: []

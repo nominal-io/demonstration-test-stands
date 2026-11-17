@@ -5,9 +5,12 @@ thread-safe, so one listener thread owns it and hands each message to the main l
 queue; the stand is only ever touched from the main loop. Each tick applies queued commands,
 advances the stand, and streams its telemetry, whose numeric state codes drive the canvas.
 
-Pass `--backend` to choose what the stand runs on; only the simulated panel (`mock`, the
-SIMULATOR tab) exists yet. Each backend streams, listens and reports status under its own names
-(`fluids_panel.NAMESPACES`), so tabs for different backends can run at once without crosstalk.
+Pass `--backend` to choose what the stand runs on: the simulated panel (`mock`, the SIMULATOR
+tab) or the cDAQ (`daq`, the HARDWARE tab). Each backend streams, listens and reports status
+under its own names (`fluids_panel.NAMESPACES`), so both tabs can run at once without crosstalk.
+
+The cDAQ is Connect's own NI-DAQmx device (`app/fluids_daq.ni-daqmx.json`): the stand reads its stream and
+commands its outputs through this script's client, from the main loop only.
 """
 
 import argparse
@@ -116,7 +119,7 @@ def main(client: connect_python.Client) -> None:
     args, _ = parser.parse_known_args()
 
     names = NAMESPACES[args.backend]
-    stand = build_stand(args.backend)
+    stand = build_stand(args.backend, client=client)
     commands: queue.Queue[dict[str, Any]] = queue.Queue()
     stop = threading.Event()
     # Outside Connect there is no message bus to listen on.

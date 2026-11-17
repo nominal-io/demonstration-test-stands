@@ -1,9 +1,10 @@
 """Control software for the fluids panel test stand."""
 
 from fluids_panel import sequences
-from fluids_panel.backend import SAFE_OUTPUTS, Backend, RawValue
+from fluids_panel.backend import SAFE_OUTPUTS, Backend, BackendFault, RawValue
 from fluids_panel.build import BACKENDS, build_stand
 from fluids_panel.commands import CommandError, handle_message
+from fluids_panel.connect_device import DEVICE_NAME, ConnectDeviceBackend
 from fluids_panel.mock import MockBackend, MockFaults, MockParams
 from fluids_panel.namespaces import NAMESPACES, Namespace
 from fluids_panel.signals import SIGNALS, SIGNALS_BY_REF, IoKind, Signal
@@ -26,6 +27,7 @@ from fluids_panel.status import NOT_RUNNING, status_message
 
 __all__ = [
     "BACKENDS",
+    "DEVICE_NAME",
     "NAMESPACES",
     "NOT_RUNNING",
     "SAFE_OUTPUTS",
@@ -33,8 +35,10 @@ __all__ = [
     "SIGNALS_BY_REF",
     "SIMULATION_INPUT_IDS",
     "Backend",
+    "BackendFault",
     "CommandError",
     "CompressorState",
+    "ConnectDeviceBackend",
     "FlowState",
     "FluidsStand",
     "FluidsStandConfig",

@@ -21,7 +21,7 @@ from functools import partial
 from types import TracebackType
 from typing import Self
 
-from fluids_panel.backend import Backend, RawValue
+from fluids_panel.backend import Backend, BackendFault, RawValue
 from fluids_panel.channels import (
     Controllable,
     ControllableNumeric,
@@ -121,6 +121,8 @@ class FluidsStand:
         self.sw_2: Measurable[bool] = Measurable()
 
         self.loop_faults: set[str] = set()
+        # Why the backend can't currently vouch for its inputs, or None if it can.
+        self.io_fault: str | None = None
         self.trips: list[str] = []
         # Every trip ever latched, oldest first. Unlike `trips`, a reset doesn't clear it, so
         # the caller can surface new trips (e.g. as toasts) by counting.
@@ -208,11 +210,22 @@ class FluidsStand:
         self.close()
 
     def update(self) -> None:
-        """Read inputs, check trips, advance the state machine and sequence, and write outputs."""
+        """Read inputs, check trips, advance the state machine and sequence, and write outputs.
+
+        If the backend can't vouch for its inputs, the stand trips on the last good readings
+        instead of acting on them.
+        """
         now = self._clock()
-        self._ingest(self.backend.read())
-        self._check_trips(now)
-        self._advance_state()
+        try:
+            inputs = self.backend.read()
+        except BackendFault as fault:
+            self.io_fault = str(fault)
+            self._trip(f"I/O fault: {fault}")
+        else:
+            self.io_fault = None
+            self._ingest(inputs)
+            self._check_trips(now)
+            self._advance_state()
         if self.trips and self._state != FluidsStandState.TRIPPED:
             self._enter_trip()
         if self._state != FluidsStandState.TRIPPED:
@@ -287,6 +300,8 @@ class FluidsStand:
     def active_faults(self) -> list[str]:
         """Faults that are present right now, as opposed to the latched `trips`."""
         faults = [f"{ref} loop fault" for ref in sorted(self.loop_faults)]
+        if self.io_fault is not None:
+            faults.append(f"I/O fault: {self.io_fault}")
         if self.sw_1.measured and self.sw_2.measured:
             faults.append("sw_1 and sw_2 both active")
         faults += [
