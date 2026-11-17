@@ -108,6 +108,7 @@ class MockBackend(Backend):
         self._clock = clock
         self._rng = random.Random(seed)
         self._outputs: dict[str, RawValue] = dict(SAFE_OUTPUTS)
+        self._inputs: dict[str, RawValue] = {}
         self._last_time: float | None = None
 
     def open(self) -> None:
@@ -135,13 +136,19 @@ class MockBackend(Backend):
             if ref not in inputs:
                 raise ValueError(f"{ref!r} is not an input signal")
             inputs[ref] = 0.0 if SIGNALS_BY_REF[ref].kind == IoKind.AI else False
-        return inputs
+        self._inputs = inputs
+        return dict(inputs)
 
     def write(self, outputs: Mapping[str, RawValue]) -> None:
         check_outputs(outputs)
         # Settle the plant under the old outputs before the new ones take effect.
         self._advance()
         self._outputs.update(outputs)
+
+    @property
+    def inputs(self) -> dict[str, RawValue]:
+        """The sample from the last `read()`, or empty before the first."""
+        return dict(self._inputs)
 
     @property
     def outputs(self) -> dict[str, RawValue]:

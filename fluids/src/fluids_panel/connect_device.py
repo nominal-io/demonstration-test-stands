@@ -109,6 +109,7 @@ class ConnectDeviceBackend(Backend):
         self._sleep = sleep
         self._open = False
         self._outputs: dict[str, RawValue] = dict(SAFE_OUTPUTS)
+        self._inputs: dict[str, RawValue] = {}
         # Per input: the stream's latest timestamp and value, and when (on our clock) the
         # timestamp last moved.
         self._timestamps: dict[str, Any] = {}
@@ -122,7 +123,7 @@ class ConnectDeviceBackend(Backend):
             raise RuntimeError("ConnectDeviceBackend is already open")
         # Whatever the stream already holds predates this run; only newer samples count.
         self._timestamps = {ref: ts for ref, (ts, _) in self._fetch().items()}
-        self._latest, self._fresh_at = {}, {}
+        self._latest, self._fresh_at, self._inputs = {}, {}, {}
         self._client.send_message(self._topic, {"set_streaming": True})
         self._open = True
         self._outputs = dict(SAFE_OUTPUTS)
@@ -161,7 +162,8 @@ class ConnectDeviceBackend(Backend):
                 inputs[ref] = bool(value)
             else:
                 inputs[ref] = float(value) * MA_PER_A
-        return inputs
+        self._inputs = inputs
+        return dict(inputs)
 
     def write(self, outputs: Mapping[str, RawValue]) -> None:
         check_outputs(outputs)
@@ -176,9 +178,16 @@ class ConnectDeviceBackend(Backend):
             self._send(changed)
 
     @property
+    def inputs(self) -> dict[str, RawValue]:
+        return dict(self._inputs)
+
+    @property
     def outputs(self) -> dict[str, RawValue]:
-        """The outputs as last commanded."""
         return dict(self._outputs)
+
+    def channel_name(self, signal: Signal) -> str:
+        """The module and channel the device config wires a signal to, e.g. `NI 9203 ai2`."""
+        return f"{PRODUCT_TYPES[signal.module]} {relative_channel(signal)}"
 
     def _require_open(self) -> None:
         if not self._open:

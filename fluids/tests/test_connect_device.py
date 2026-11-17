@@ -12,6 +12,7 @@ from fluids_panel.connect_device import (
     ConnectDeviceBackend,
     device_topic,
 )
+from fluids_panel.signals import SIGNALS_BY_REF
 from fluids_panel.stand import FluidsStand, FluidsStandState, InterlockError
 
 TOPIC = "devices/fluids_daq/command"
@@ -122,6 +123,7 @@ def test_read_converts_amps_to_ma_and_lines_to_bools(backend, connect):
     assert inputs["fm_1"] == 0.0  # a broken loop, which the stand must still see
     assert inputs["sw_1"] is False
     assert inputs["sw_2"] is True
+    assert backend.inputs == inputs
 
 
 def test_read_faults_once_the_stream_stalls_and_recovers_when_it_resumes(
@@ -173,6 +175,11 @@ def test_close_commands_outputs_safe(backend, connect):
     backend.close()  # idempotent
     with pytest.raises(RuntimeError, match="not open"):
         backend.write({"pump_1": True})
+
+
+def test_channel_names_are_module_channels(backend):
+    assert backend.channel_name(SIGNALS_BY_REF["fm_1"]) == "NI 9203 ai2"
+    assert backend.channel_name(SIGNALS_BY_REF["v_5"]) == "NI 9476 (Spring) port0/line3"
 
 
 def test_device_topic_sanitizes_like_connect():

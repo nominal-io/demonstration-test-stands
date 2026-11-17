@@ -5,6 +5,7 @@ from fluids_panel.backend import SAFE_OUTPUTS, Backend, BackendFault, RawValue
 from fluids_panel.build import BACKENDS, build_stand
 from fluids_panel.commands import CommandError, handle_message
 from fluids_panel.connect_device import DEVICE_NAME, ConnectDeviceBackend
+from fluids_panel.io_table import io_table
 from fluids_panel.mock import MockBackend, MockFaults, MockParams
 from fluids_panel.namespaces import NAMESPACES, Namespace
 from fluids_panel.signals import SIGNALS, SIGNALS_BY_REF, IoKind, Signal
@@ -58,6 +59,7 @@ __all__ = [
     "build_stand",
     "canvas_states",
     "handle_message",
+    "io_table",
     "sequences",
     "status_message",
 ]

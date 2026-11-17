@@ -10,7 +10,9 @@ tab) or the cDAQ (`daq`, the HARDWARE tab). Each backend streams, listens and re
 under its own names (`fluids_panel.NAMESPACES`), so both tabs can run at once without crosstalk.
 
 The cDAQ is Connect's own NI-DAQmx device (`app/fluids_daq.ni-daqmx.json`): the stand reads its stream and
-commands its outputs through this script's client, from the main loop only.
+commands its outputs through this script's client, from the main loop only. The script's output
+is also a table of every DAQ line (`fluids_panel.io_table`), which the HARDWARE tab's I/O pane
+displays.
 """
 
 import argparse
@@ -29,12 +31,14 @@ from fluids_panel import (
     NOT_RUNNING,
     SIGNALS_BY_REF,
     CommandError,
+    ConnectDeviceBackend,
     FluidsStand,
     InterlockError,
     MockBackend,
     apply_simulation_settings,
     build_stand,
     handle_message,
+    io_table,
     status_message,
 )
 
@@ -42,6 +46,7 @@ logger = connect_python.get_logger(__name__)
 
 POLL_INTERVAL_S = 0.1
 LISTEN_INTERVAL_S = 0.05
+IO_TABLE_INTERVAL_S = 0.5
 
 UNITS = {
     ref: unit
@@ -134,6 +139,8 @@ def main(client: connect_python.Client) -> None:
             listener.start()
         reported = 0
         status = None
+        show_io = isinstance(stand.backend, ConnectDeviceBackend)
+        io_shown_at = -IO_TABLE_INTERVAL_S
         try:
             while True:
                 apply_commands(client, stand, commands)
@@ -149,6 +156,9 @@ def main(client: connect_python.Client) -> None:
                 client.stream_from_dict(
                     names.stream_id, time.time(), telemetry, units=units
                 )
+                if show_io and time.monotonic() - io_shown_at >= IO_TABLE_INTERVAL_S:
+                    io_shown_at = time.monotonic()
+                    client.set_output(io_table(stand.backend))
                 time.sleep(POLL_INTERVAL_S)
         finally:
             client.set_value(names.status_value_id, NOT_RUNNING)

@@ -222,6 +222,16 @@ tiles:
                         topic: script/fluids_hw/cmd
                         name: shutdown
                         action: sequence
+              - width: 1.0
+                tile:
+                  layout: pane
+                  id: 119f479d-5892-4c5d-a37d-7d659f50a7e2
+                  title: cDAQ I/O
+                  direction: vertical
+                  should_fill: true
+                  elements:
+                  - display: table
+                    script_id: hw-control
         - width: 0.28
           tile:
             layout: grid

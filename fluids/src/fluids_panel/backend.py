@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from types import TracebackType
 from typing import Self
 
-from fluids_panel.signals import LOOP_MIN_MA, SIGNALS, SIGNALS_BY_REF, IoKind
+from fluids_panel.signals import LOOP_MIN_MA, SIGNALS, SIGNALS_BY_REF, IoKind, Signal
 
 type RawValue = bool | float
 
@@ -71,6 +71,20 @@ class Backend(ABC):
     @abstractmethod
     def write(self, outputs: Mapping[str, RawValue]) -> None:
         """Update some or all outputs: relays as bools, analog outputs as mA. Others hold their value."""
+
+    @property
+    @abstractmethod
+    def inputs(self) -> dict[str, RawValue]:
+        """The sample from the last `read()`, or empty before the first."""
+
+    @property
+    @abstractmethod
+    def outputs(self) -> dict[str, RawValue]:
+        """Every output as last commanded. Not read back: the modules can't report their lines."""
+
+    def channel_name(self, signal: Signal) -> str:
+        """Where a signal is wired, for display. Backends that know the real channel override this."""
+        return f"{signal.module} line {signal.line}"
 
     def __enter__(self) -> Self:
         self.open()
