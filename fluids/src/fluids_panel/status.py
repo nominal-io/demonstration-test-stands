@@ -1,12 +1,11 @@
 """A one-line, operator-facing description of what the stand is doing and what to do next.
 
-The Connect script publishes it to the app value STATUS_VALUE_ID, which a callout at the top of
-the controls displays, so the panel always says what state it is in and which controls apply.
+The Connect script publishes it to its namespace's status value (see `namespaces.py`), which a
+callout at the top of the controls displays, so the panel always says what state it is in and
+which controls apply.
 """
 
 from fluids_panel.stand import FluidsStand, FluidsStandState
-
-STATUS_VALUE_ID = "stand-status"
 
 NOT_RUNNING = "Stand Control is not running. Start it under Script Controls."
 
