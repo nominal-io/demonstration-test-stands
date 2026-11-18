@@ -34,5 +34,7 @@ def status_message(stand: FluidsStand) -> str:
         case FluidsStandState.READY:
             return "Ready. Click a valve on the diagram or run a sequence."
         case FluidsStandState.VENTING:
+            if "p_1" in stand.low_loops:
+                return "Venting: p_1 can't be read (loop current low), so it can't confirm vented."
             return f"Venting: p_1 at {p_1:.0f} psi."
     return stand.state.name

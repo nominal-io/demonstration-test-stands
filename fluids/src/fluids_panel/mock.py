@@ -55,6 +55,10 @@ class MockParams:
     max_step_s: float = 0.05
 
 
+# What a transmitter driving its NAMUR NE 43 high failure signal puts on the loop.
+SHORTED_LOOP_MA = 22.0
+
+
 @dataclass
 class MockFaults:
     """Faults that can be switched on and off while the mock runs."""
@@ -71,6 +75,9 @@ class MockFaults:
     broken_wires: set[str] = field(
         default_factory=set
     )  # inputs that read as an open loop
+    shorted_loops: set[str] = field(
+        default_factory=set
+    )  # analog inputs whose transmitter has failed high
 
 
 @dataclass
@@ -136,6 +143,10 @@ class MockBackend(Backend):
             if ref not in inputs:
                 raise ValueError(f"{ref!r} is not an input signal")
             inputs[ref] = 0.0 if SIGNALS_BY_REF[ref].kind == IoKind.AI else False
+        for ref in self.faults.shorted_loops:
+            if ref not in inputs or SIGNALS_BY_REF[ref].kind != IoKind.AI:
+                raise ValueError(f"{ref!r} is not an analog input signal")
+            inputs[ref] = SHORTED_LOOP_MA
         self._inputs = inputs
         return dict(inputs)
 

@@ -9,6 +9,8 @@ from fluids_panel.signals import (
     Signal,
     eng_to_ma,
     is_loop_fault,
+    is_loop_over,
+    is_loop_under,
     ma_to_eng,
 )
 
@@ -75,6 +77,22 @@ def test_scaling_rejects_digital_signals():
 )
 def test_is_loop_fault(ma, fault):
     assert is_loop_fault(ma) is fault
+    assert is_loop_fault(ma) is (is_loop_under(ma) or is_loop_over(ma))
+
+
+@pytest.mark.parametrize(
+    ("ma", "under", "over"),
+    [
+        (0.0, True, False),
+        (3.59, True, False),
+        (3.6, False, False),
+        (21.0, False, False),
+        (21.01, False, True),
+    ],
+)
+def test_loop_fault_direction(ma, under, over):
+    assert is_loop_under(ma) is under
+    assert is_loop_over(ma) is over
 
 
 @pytest.mark.parametrize(

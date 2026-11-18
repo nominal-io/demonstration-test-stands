@@ -31,6 +31,18 @@ def test_venting(stand, clock):
     assert status_message(stand).startswith("Venting: p_1 at ")
 
 
+def test_venting_with_low_p_1_loop_says_it_cant_be_read(stand, mock, clock):
+    stand.pressurize()
+    tick_until(stand, clock, lambda: stand.state == FluidsStandState.READY, 60.0)
+    stand.vent()
+    tick(stand, clock, 0.1)
+    mock.faults.broken_wires.add("p_1")
+    tick(stand, clock, 0.1)
+    assert status_message(stand) == (
+        "Venting: p_1 can't be read (loop current low), so it can't confirm vented."
+    )
+
+
 def test_sequence_names_what_it_waits_for(stand, clock):
     sequences.start(stand, "startup")
     assert status_message(stand) == (
@@ -50,6 +62,6 @@ def test_tripped_gives_reason_and_next_step(stand, mock, clock):
 
 
 def test_tripped_counts_extra_reasons(stand, mock, clock):
-    mock.faults.broken_wires.update({"p_2", "fm_1"})
+    mock.faults.shorted_loops.add("p_2")  # over its limit, and its loop over range
     tick(stand, clock, 0.1)
     assert "(+1 more in the logs)" in status_message(stand)

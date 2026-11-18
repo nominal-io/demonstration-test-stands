@@ -116,6 +116,15 @@ def report_new_trips(
     return len(stand.trip_history)
 
 
+def report_new_warnings(
+    client: connect_python.Client, stand: FluidsStand, reported: int
+) -> int:
+    """Toast any warnings since the last call, returning how many have now been reported."""
+    for message in stand.warnings[reported:]:
+        client.send_notification(message, level="warn", duration_seconds=10)
+    return len(stand.warnings)
+
+
 @connect_python.main
 def main(client: connect_python.Client) -> None:
     install_library_logging()
@@ -138,6 +147,7 @@ def main(client: connect_python.Client) -> None:
         if not isinstance(client, StubClient):
             listener.start()
         reported = 0
+        warned = 0
         status = None
         show_io = isinstance(stand.backend, ConnectDeviceBackend)
         io_shown_at = -IO_TABLE_INTERVAL_S
@@ -148,6 +158,7 @@ def main(client: connect_python.Client) -> None:
                     apply_simulation_settings(stand.backend, client.get_values())
                 stand.update()
                 reported = report_new_trips(client, stand, reported)
+                warned = report_new_warnings(client, stand, warned)
                 if (new_status := status_message(stand)) != status:
                     status = new_status
                     client.set_value(names.status_value_id, status)

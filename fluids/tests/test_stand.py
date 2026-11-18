@@ -3,6 +3,7 @@ import math
 import pytest
 from conftest import FakeClock, tick, tick_until
 
+from fluids_panel import sequences
 from fluids_panel.backend import SAFE_OUTPUTS
 from fluids_panel.mock import MockBackend
 from fluids_panel.stand import FluidsStand, FluidsStandState, InterlockError
@@ -163,15 +164,39 @@ def test_estop_trips_on_supply_loss(stand, mock, clock):
     make_ready(stand, clock)
     mock.faults.estop = True
     tick(stand, clock, 5.0)
+    # p_1's loop stays healthy, so this is a real loss of supply, not a failed sensor.
+    assert stand.low_loops == set()
     assert_tripped(stand, mock, "supply lost")
+    assert any("E-stop pressed?" in trip for trip in stand.trips)
 
 
-def test_compressor_failure_trips_after_pressurize_timeout(stand, mock, clock):
+def test_compressor_failure_warns_and_vents_after_pressurize_timeout(
+    stand, mock, clock
+):
     mock.faults.compressor_failed = True
     stand.pressurize()
     tick(stand, clock, stand.config.pressurize_timeout_s + 1.0)
-    assert_tripped(stand, mock, "did not reach")
+    assert stand.trips == []
+    assert stand.state in (FluidsStandState.VENTING, FluidsStandState.VENTED)
+    assert mock.outputs == SAFE_OUTPUTS
+    assert stand.warnings == ["p_1 did not reach 75 psi within 90 s; venting"]
     assert stand.telemetry()["pump_1.state"] == CompressorState.FAULT
+
+    mock.faults.compressor_failed = False
+    tick_until(stand, clock, lambda: stand.state == FluidsStandState.VENTED, 30.0)
+    stand.pressurize()  # a fresh attempt clears the fault
+    assert stand.telemetry()["pump_1.state"] == CompressorState.RUNNING
+
+
+def test_startup_stops_when_pressurize_times_out(stand, mock, clock):
+    mock.faults.compressor_failed = True
+    sequences.start(stand, "startup")
+    tick(stand, clock, stand.config.pressurize_timeout_s + 1.0)
+    assert not stand.sequence_running
+    assert stand.trips == []
+    assert (
+        len(stand.warnings) == 1
+    )  # the stand's warning, not a second from the sequence
 
 
 def test_regulator_failure_trips_on_overpressure(stand, mock, clock):
@@ -182,26 +207,144 @@ def test_regulator_failure_trips_on_overpressure(stand, mock, clock):
     assert len(stand.trips) == 1
 
 
-def test_stuck_actuator_trips(stand, mock, clock):
+def test_stuck_actuator_warns_once_and_retracts(stand, mock, clock):
     make_ready(stand, clock)
-    mock.faults.actuator_stuck = True
     stand.extend()
+    tick(stand, clock, 0.5)  # partway out
+    mock.faults.actuator_stuck = True
     tick(stand, clock, stand.config.actuator_timeout_s + 1.0)
-    assert_tripped(stand, mock, "actuator did not reach sw_2")
+    assert stand.trips == []
+    assert stand.state == FluidsStandState.READY
+    assert stand.v_3.setpoint is False
+    assert stand.warnings == [
+        "actuator did not reach sw_2 (extended) within 5 s; retracting"
+    ]
     assert stand.telemetry()["actuator.state"] == ValveState.FAULT
 
+    # Stuck mid-stroke it can't retract either, but that doesn't warn again every 5 s.
+    tick(stand, clock, 3 * stand.config.actuator_timeout_s)
+    assert len(stand.warnings) == 1
+    assert stand.telemetry()["actuator.state"] == ValveState.FAULT
 
-def test_broken_wire_trips_and_blocks_reset(stand, mock, clock):
+    mock.faults.actuator_stuck = False
+    tick_until(stand, clock, lambda: bool(stand.sw_1.measured), 10.0)
+    tick(stand, clock, 0.1)
+    assert stand.telemetry()["actuator.state"] == ValveState.CLOSED
+
+
+def test_actuate_stops_when_the_actuator_sticks(stand, mock, clock):
+    make_ready(stand, clock)
+    mock.faults.actuator_stuck = True
+    sequences.start(stand, "actuate")
+    tick(stand, clock, stand.config.actuator_timeout_s + 2.0)
+    assert not stand.sequence_running
+    assert stand.trips == []
+    assert (
+        len(stand.warnings) == 1
+    )  # the stand's warning, not a second from the sequence
+
+
+def test_broken_wire_warns_without_tripping(stand, mock, clock):
     make_ready(stand, clock)
     mock.faults.broken_wires.add("fm_1")
     tick(stand, clock, 0.1)
-    assert_tripped(stand, mock, "fm_1 loop current")
+    assert stand.state == FluidsStandState.READY
+    assert stand.trips == []
+    assert stand.low_loops == {"fm_1"}
+    assert stand.warnings == [
+        (
+            "fm_1 loop current low at 0.00 mA (broken wire or failed sensor?); "
+            "its readings can't be trusted"
+        )
+    ]
     assert stand.telemetry()["fm_1.state"] == FlowState.FAULT
 
-    with pytest.raises(InterlockError, match="fm_1 loop fault"):
-        stand.reset()
+    mock.faults.broken_wires.clear()
+    tick(stand, clock, stand.config.loop_low_clear_s - 0.5)
+    assert stand.low_loops == {"fm_1"}  # not healthy for long enough yet
+    tick(stand, clock, 1.0)
+    assert stand.low_loops == set()
+    assert stand.warnings[-1] == "fm_1 loop current back in range"
+
+
+def test_noisy_low_loop_warns_once(stand, mock, clock):
+    for _ in range(10):  # dips shorter than the clear time apart
+        mock.faults.broken_wires.add("p_2")
+        tick(stand, clock, 0.1)
+        mock.faults.broken_wires.clear()
+        tick(stand, clock, 1.0)
+    assert stand.trips == []
+    assert len(stand.warnings) == 1
+    assert stand.low_loops == {"p_2"}
+
+
+def test_low_p_1_loop_blocks_pressurize(stand, mock, clock):
+    mock.faults.broken_wires.add("p_1")
+    tick(stand, clock, 0.1)
+    with pytest.raises(InterlockError, match="p_1's loop current is low"):
+        stand.pressurize()
+    assert mock.outputs == SAFE_OUTPUTS
 
     mock.faults.broken_wires.clear()
+    tick(stand, clock, stand.config.loop_low_clear_s + 0.5)
+    stand.pressurize()
+    assert stand.state == FluidsStandState.PRESSURIZING
+
+
+def assert_vented_on_low_p_1_loop(stand: FluidsStand, mock: MockBackend, clock) -> None:
+    mock.faults.broken_wires.add("p_1")
+    tick(stand, clock, 0.1)
+    assert stand.state == FluidsStandState.VENTING
+    assert stand.trips == []
+    assert not stand.sequence_running
+    assert mock.outputs == SAFE_OUTPUTS
+    assert stand.warnings[-1] == "p_1 can't be read with the compressor on; venting"
+    assert len(stand.warnings) == 2  # the low loop, then the vent; once each
+    assert stand.telemetry()["pump_1.state"] == CompressorState.OFF
+
+    tick(stand, clock, 10.0)
+    assert len(stand.warnings) == 2
+
+
+def test_low_p_1_loop_while_pressurizing_vents(stand, mock, clock):
+    sequences.start(stand, "startup")
+    tick(stand, clock, 5.0)
+    assert_vented_on_low_p_1_loop(stand, mock, clock)
+
+
+def test_low_p_1_loop_while_ready_vents_rather_than_trips(stand, mock, clock):
+    make_ready(stand, clock)
+    sequences.start(stand, "flow")
+    tick(stand, clock, 1.0)
+    assert_vented_on_low_p_1_loop(stand, mock, clock)
+
+
+def test_low_p_1_loop_holds_venting_until_it_reads_again(stand, mock, clock):
+    make_ready(stand, clock)
+    stand.vent()
+    tick(stand, clock, 0.1)
+    mock.faults.broken_wires.add("p_1")
+    tick(stand, clock, 30.0)  # long enough to have vented, but it can't be confirmed
+    assert stand.state == FluidsStandState.VENTING
+    assert stand.trips == []
+
+    mock.faults.broken_wires.clear()
+    tick(stand, clock, stand.config.loop_low_clear_s - 0.5)
+    assert stand.state == FluidsStandState.VENTING
+    tick_until(stand, clock, lambda: stand.state == FluidsStandState.VENTED, 2.0)
+
+
+def test_shorted_loop_trips_and_blocks_reset(stand, mock, clock):
+    make_ready(stand, clock)
+    mock.faults.shorted_loops.add("fm_1")
+    tick(stand, clock, 0.1)
+    assert_tripped(stand, mock, "fm_1 loop current over range")
+    assert stand.telemetry()["fm_1.state"] == FlowState.FAULT
+
+    with pytest.raises(InterlockError, match="fm_1 loop over range"):
+        stand.reset()
+
+    mock.faults.shorted_loops.clear()
     tick(stand, clock, 0.1)
     stand.reset()
     assert stand.trips == []

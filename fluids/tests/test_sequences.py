@@ -96,26 +96,58 @@ def test_one_sequence_at_a_time(stand):
         sequences.start(stand, "shutdown")
 
 
-def test_wait_timeout_trips(stand, mock, clock):
+def test_wait_timeout_stops_with_a_warning(stand, mock, clock):
     def never(s: FluidsStand):
         yield WaitUntil("never", lambda: False, timeout_s=1.0)
 
     stand.start_sequence("never", never(stand))
-    tick_until(stand, clock, lambda: stand.state == FluidsStandState.TRIPPED, 5.0)
-    assert any("timed out waiting for never" in trip for trip in stand.trips)
-    assert not stand.sequence_running
+    tick_until(stand, clock, lambda: not stand.sequence_running, 5.0)
+    assert stand.trips == []
+    assert stand.state == FluidsStandState.VENTED
+    assert stand.warnings == ["sequence never stopped: timed out waiting for never"]
 
 
-def test_refused_later_step_trips(stand, mock, clock):
+def test_refused_later_step_stops_with_a_warning(stand, mock, clock):
     def extend_while_vented(s: FluidsStand):
         yield s.wait(0.5)
         s.extend()
         yield s.wait(0.5)
 
     stand.start_sequence("bad", extend_while_vented(stand))
-    tick_until(stand, clock, lambda: stand.state == FluidsStandState.TRIPPED, 5.0)
-    assert any("sequence bad" in trip for trip in stand.trips)
+    tick_until(stand, clock, lambda: not stand.sequence_running, 5.0)
+    assert stand.trips == []
+    assert stand.warnings == ["sequence bad stopped: requires READY, not VENTED"]
     assert mock.outputs == SAFE_OUTPUTS
+
+
+def test_flow_that_never_arrives_closes_v_2(stand, mock, clock):
+    run_sequence(stand, clock, "startup")
+    mock.faults.broken_wires.add("fm_1")  # fm_1 never reads the flow
+    run_sequence(stand, clock, "flow", lpm=12.0)
+    assert stand.trips == []
+    assert stand.state == FluidsStandState.READY
+    assert stand.v_2.setpoint == 0.0
+    assert any("sequence flow stopped: timed out" in w for w in stand.warnings)
+
+
+def test_proof_leak_that_never_fills_rests_the_leg(stand, mock, clock):
+    run_sequence(stand, clock, "startup")
+    mock.faults.broken_wires.add("p_2")  # p_2 never reads the fill
+    run_sequence(stand, clock, "proof_leak", psig=72.5)
+    assert stand.trips == []
+    assert stand.state == FluidsStandState.READY
+    assert stand.pr_2.setpoint == 0.0
+    assert stand.v_5.setpoint is False
+    assert any("sequence proof_leak stopped: timed out" in w for w in stand.warnings)
+
+
+def test_abort_rests_the_running_leg(stand, clock):
+    run_sequence(stand, clock, "startup")
+    sequences.start(stand, "proof_leak", hold_s=60.0)
+    stand.abort_sequence()
+    assert stand.pr_2.setpoint == 0.0
+    assert stand.v_5.setpoint is False
+    assert stand.state == FluidsStandState.READY
 
 
 def test_trip_aborts_sequence(stand, mock, clock):
