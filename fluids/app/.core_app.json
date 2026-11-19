@@ -1,0 +1,22 @@
+{
+  "app.connect": {
+    "workspaces": {
+      "ri.security.cerulean-staging.workspace.79c2cdd1-4ccd-4288-b06b-24e902a6b3af": {
+        "app_rid": "ri.scout.cerulean-staging.connect-app.a7dbbcc8-2139-4aa3-bd06-26f278d430c3",
+        "last_bundled_files": [
+          "0fbfc996-4451-45c5-ba3c-efbbf67cc42d.yaml",
+          "96ccc0e2-42d7-458a-a38d-2185ede3d4c2.yaml",
+          "app.connect",
+          "controls.md",
+          "fluids_daq.ni-daqmx.json",
+          "stand_control.py",
+          "wheels"
+        ],
+        "last_lockdown": {
+          "storage": false,
+          "channels": false
+        }
+      }
+    }
+  }
+}
