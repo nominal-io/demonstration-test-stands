@@ -1,12 +1,11 @@
 """A one-line, operator-facing description of what the stand is doing and what to do next.
 
-The Connect script publishes it to the app value STATUS_VALUE_ID, which a callout at the top of
-the controls displays, so the panel always says what state it is in and which controls apply.
+The Connect script publishes it to its namespace's status value (see `namespaces.py`), which a
+callout at the top of the controls displays, so the panel always says what state it is in and
+which controls apply.
 """
 
 from fluids_panel.stand import FluidsStand, FluidsStandState
-
-STATUS_VALUE_ID = "stand-status"
 
 NOT_RUNNING = "Stand Control is not running. Start it under Script Controls."
 
@@ -35,5 +34,7 @@ def status_message(stand: FluidsStand) -> str:
         case FluidsStandState.READY:
             return "Ready. Click a valve on the diagram or run a sequence."
         case FluidsStandState.VENTING:
+            if "p_1" in stand.low_loops:
+                return "Venting: p_1 can't be read (loop current low), so it can't confirm vented."
             return f"Venting: p_1 at {p_1:.0f} psi."
     return stand.state.name

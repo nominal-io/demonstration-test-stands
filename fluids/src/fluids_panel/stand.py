@@ -8,6 +8,13 @@ keeps a caller's loop (e.g. the Connect script) streaming while the panel moves.
 Relay channels (`pump_1`, `v_1`, `v_3`, `v_5`) hold whether the relay is energized, matching
 the DAQ. For the normally-open valves `v_1` and `v_5`, energized means closed.
 
+Trips are for danger. An analog loop over range (NAMUR NE 43's high failure band) trips, since
+on p_1 or p_2 it may be a real overpressure. A loop under range only means the sensor can't be
+read: rv_1 limits every part of the panel to its 100 psi MAWP without software (system manual,
+Section 5), so a low loop is reported as a warning instead. While p_1's loop is low the
+compressor can't be started, and one already running is vented, since it would run
+unmonitored (manual, Section 7.4); nor does venting count as done, since it can't be confirmed.
+
 The stand is not thread-safe: call its commands and `update()` from one thread.
 """
 
@@ -21,7 +28,7 @@ from functools import partial
 from types import TracebackType
 from typing import Self
 
-from fluids_panel.backend import Backend, RawValue
+from fluids_panel.backend import Backend, BackendFault, RawValue
 from fluids_panel.channels import (
     Controllable,
     ControllableNumeric,
@@ -33,6 +40,8 @@ from fluids_panel.signals import (
     analog_full_scale,
     eng_to_ma,
     is_loop_fault,
+    is_loop_over,
+    is_loop_under,
     ma_to_eng,
 )
 from fluids_panel.states import CompressorState, FlowState, LightState, ValveState
@@ -70,11 +79,14 @@ class FluidsStandConfig:
     # fm_1 below which there is no flow: a low-flow cutoff well clear of the 0-100 L/min
     # meter's noise, but under 7% of v_2's 15.6 L/min range so any real command reads as flow.
     flowing_lpm: float = 1.0
+    # How long a low loop must read healthy before it counts as recovered. Keeps a noisy loop
+    # dipping across the threshold from warning on every dip.
+    loop_low_clear_s: float = 5.0
 
 
 @dataclass(frozen=True)
 class WaitUntil:
-    """Yielded by a sequence to pause until `condition` holds. Timing out trips the stand."""
+    """Yielded by a sequence to pause until `condition` holds. Timing out stops the sequence."""
 
     description: str
     condition: Callable[[], bool]
@@ -120,7 +132,16 @@ class FluidsStand:
         self.sw_1: Measurable[bool] = Measurable()
         self.sw_2: Measurable[bool] = Measurable()
 
+        # Analog inputs whose latest reading is out of band, either way. For display.
         self.loop_faults: set[str] = set()
+        # Analog inputs held as reading low until they have read healthy for loop_low_clear_s.
+        self.low_loops: set[str] = set()
+        # Non-tripping warnings, oldest first, for the caller to surface (e.g. as toasts).
+        self.warnings: list[str] = []
+        self._over_loops: set[str] = set()
+        self._loop_healthy_since: dict[str, float] = {}
+        # Why the backend can't currently vouch for its inputs, or None if it can.
+        self.io_fault: str | None = None
         self.trips: list[str] = []
         # Every trip ever latched, oldest first. Unlike `trips`, a reset doesn't clear it, so
         # the caller can surface new trips (e.g. as toasts) by counting.
@@ -208,11 +229,22 @@ class FluidsStand:
         self.close()
 
     def update(self) -> None:
-        """Read inputs, check trips, advance the state machine and sequence, and write outputs."""
+        """Read inputs, check trips, advance the state machine and sequence, and write outputs.
+
+        If the backend can't vouch for its inputs, the stand trips on the last good readings
+        instead of acting on them.
+        """
         now = self._clock()
-        self._ingest(self.backend.read())
-        self._check_trips(now)
-        self._advance_state()
+        try:
+            inputs = self.backend.read()
+        except BackendFault as fault:
+            self.io_fault = str(fault)
+            self._trip(f"I/O fault: {fault}")
+        else:
+            self.io_fault = None
+            self._ingest(inputs, now)
+            self._check_trips(now)
+            self._advance_state()
         if self.trips and self._state != FluidsStandState.TRIPPED:
             self._enter_trip()
         if self._state != FluidsStandState.TRIPPED:
@@ -224,6 +256,12 @@ class FluidsStand:
     def pressurize(self) -> None:
         """Start the compressor and close the main vent (startup steps 1.4-1.5)."""
         self._require(FluidsStandState.VENTED, FluidsStandState.VENTING)
+        if "p_1" in self.low_loops:
+            raise InterlockError(
+                "p_1's loop current is low (broken wire or failed sensor); "
+                "the compressor can't run without p_1 monitoring it"
+            )
+        self._compressor_fault = False  # a fresh attempt gets a fresh check
         self.pump_1.setpoint = True
         self.v_1.setpoint = True
         self._set_state(FluidsStandState.PRESSURIZING)
@@ -253,10 +291,13 @@ class FluidsStand:
         """Energize v_3 to extend the actuator."""
         self._require(FluidsStandState.READY)
         self.v_3.setpoint = True
+        self._actuator_off_target_since = None
+        self._actuator_fault = False  # a fresh move gets a fresh check
 
     def retract(self) -> None:
         """De-energize v_3 to retract the actuator."""
         self.v_3.setpoint = False
+        self._actuator_off_target_since = None
 
     def set_vessel_pressure(self, psig: float) -> None:
         """Command pr_2 to a pressure in psig, clamped to its range."""
@@ -286,7 +327,9 @@ class FluidsStand:
 
     def active_faults(self) -> list[str]:
         """Faults that are present right now, as opposed to the latched `trips`."""
-        faults = [f"{ref} loop fault" for ref in sorted(self.loop_faults)]
+        faults = [f"{ref} loop over range" for ref in sorted(self._over_loops)]
+        if self.io_fault is not None:
+            faults.append(f"I/O fault: {self.io_fault}")
         if self.sw_1.measured and self.sw_2.measured:
             faults.append("sw_1 and sw_2 both active")
         faults += [
@@ -311,7 +354,9 @@ class FluidsStand:
         """Run `sequence`'s first step now, then one step per update(). One sequence at a time.
 
         If the first step's commands are refused, the InterlockError propagates here and the
-        sequence never starts. Once running, a refused command or timed-out wait trips the stand.
+        sequence never starts. Once running, a refused command or timed-out wait stops the
+        sequence with a warning rather than tripping: failing to reach a setpoint isn't
+        dangerous. Sequences return their own leg to rest when stopped early.
         """
         if self._sequence is not None:
             raise InterlockError(f"sequence {self.sequence_name!r} is already running")
@@ -328,7 +373,8 @@ class FluidsStand:
         self._begin_wait(wait)
 
     def abort_sequence(self) -> None:
-        """Stop the running sequence where it is, leaving outputs as they are."""
+        """Stop the running sequence where it is. It returns its own leg to rest; other outputs
+        are left as they are."""
         if self._sequence is None:
             return
         logger.warning("sequence %s: aborted", self.sequence_name)
@@ -393,15 +439,38 @@ class FluidsStand:
     def _reading(channel: Measurable[float]) -> float:
         return channel.measured if channel.measured is not None else math.nan
 
-    def _ingest(self, inputs: dict[str, RawValue]) -> None:
-        self.loop_faults = {
-            ref for ref in ANALOG_INPUTS if is_loop_fault(float(inputs[ref]))
-        }
+    def _ingest(self, inputs: dict[str, RawValue], now: float) -> None:
+        loop_ma = {ref: float(inputs[ref]) for ref in ANALOG_INPUTS}
+        self.loop_faults = {ref for ref, ma in loop_ma.items() if is_loop_fault(ma)}
+        self._over_loops = {ref for ref, ma in loop_ma.items() if is_loop_over(ma)}
+        self._watch_low_loops(loop_ma, now)
         self.p_1.measured = ma_to_eng(SIGNALS_BY_REF["p_1"], float(inputs["p_1"]))
         self.p_2.measured = ma_to_eng(SIGNALS_BY_REF["p_2"], float(inputs["p_2"]))
         self.fm_1.measured = ma_to_eng(SIGNALS_BY_REF["fm_1"], float(inputs["fm_1"]))
         self.sw_1.measured = bool(inputs["sw_1"])
         self.sw_2.measured = bool(inputs["sw_2"])
+
+    def _watch_low_loops(self, loop_ma: dict[str, float], now: float) -> None:
+        """Warn once when a loop goes low, and once when it has read healthy for a while."""
+        for ref, ma in loop_ma.items():
+            if is_loop_under(ma):
+                self._loop_healthy_since.pop(ref, None)
+                if ref not in self.low_loops:
+                    self.low_loops.add(ref)
+                    self._warn(
+                        f"{ref} loop current low at {ma:.2f} mA (broken wire or failed "
+                        "sensor?); its readings can't be trusted"
+                    )
+            elif ref in self.low_loops:
+                since = self._loop_healthy_since.setdefault(ref, now)
+                if now - since >= self.config.loop_low_clear_s:
+                    self.low_loops.discard(ref)
+                    del self._loop_healthy_since[ref]
+                    self._warn(f"{ref} loop current back in range")
+
+    def _warn(self, message: str) -> None:
+        logger.warning(message)
+        self.warnings.append(message)
 
     def _trip(self, reason: str) -> None:
         if reason not in self.trips:
@@ -416,9 +485,9 @@ class FluidsStand:
 
     def _check_trips(self, now: float) -> None:
         config = self.config
-        for ref in sorted(self.loop_faults):
+        for ref in sorted(self._over_loops):
             self._trip(
-                f"{ref} loop current out of range (broken wire or failed sensor)"
+                f"{ref} loop current over range (past full scale, shorted wire or failed sensor)"
             )
         if self.sw_1.measured and self.sw_2.measured:
             self._actuator_fault = True
@@ -426,28 +495,52 @@ class FluidsStand:
 
         p_1 = self._reading(self.p_1)
         if (
+            self._state in (FluidsStandState.PRESSURIZING, FluidsStandState.READY)
+            and "p_1" in self.low_loops
+        ):
+            # The same rule pressurize() enforces: the compressor mustn't run with nothing
+            # watching p_1. A failed sensor isn't itself dangerous, so vent rather than trip.
+            self.abort_sequence()
+            self.vent()
+            self._warn("p_1 can't be read with the compressor on; venting")
+        if (
             self._state == FluidsStandState.PRESSURIZING
             and now - self._state_since > config.pressurize_timeout_s
         ):
+            # Not dangerous: the supply just isn't building. Give up and vent rather than trip,
+            # so the compressor doesn't run on indefinitely.
             self._compressor_fault = True
-            self._trip(
-                f"p_1 did not reach {config.ready_psi:g} psi within {config.pressurize_timeout_s:g} s"
+            self.abort_sequence()
+            self.vent()
+            self._warn(
+                f"p_1 did not reach {config.ready_psi:g} psi within "
+                f"{config.pressurize_timeout_s:g} s; venting"
             )
+        # A low p_1 loop has already vented above, so a low reading here is a real loss.
         if self._state == FluidsStandState.READY and p_1 < config.supply_lost_psi:
             self._trip(f"supply lost: p_1 fell to {p_1:.1f} psi (E-stop pressed?)")
 
-        # The actuator should reach whichever switch v_3 is driving it towards.
+        # The actuator should reach whichever switch v_3 is driving it towards. Not reaching it
+        # isn't dangerous, so it warns once and retracts rather than tripping; the fault clears
+        # when the actuator reaches a switch, or on a fresh extend.
         if self._state == FluidsStandState.READY:
             at_target = self.sw_2.measured if self.v_3.setpoint else self.sw_1.measured
             if at_target:
                 self._actuator_off_target_since = None
+                self._actuator_fault = False
             elif self._actuator_off_target_since is None:
                 self._actuator_off_target_since = now
-            elif now - self._actuator_off_target_since > config.actuator_timeout_s:
+            elif (
+                now - self._actuator_off_target_since > config.actuator_timeout_s
+                and not self._actuator_fault
+            ):
                 target = "sw_2 (extended)" if self.v_3.setpoint else "sw_1 (retracted)"
                 self._actuator_fault = True
-                self._trip(
-                    f"actuator did not reach {target} within {config.actuator_timeout_s:g} s"
+                self.abort_sequence()
+                self.retract()
+                self._warn(
+                    f"actuator did not reach {target} within "
+                    f"{config.actuator_timeout_s:g} s; retracting"
                 )
         else:
             self._actuator_off_target_since = None
@@ -459,7 +552,12 @@ class FluidsStand:
             and p_1 >= self.config.ready_psi
         ):
             self._set_state(FluidsStandState.READY)
-        elif self._state == FluidsStandState.VENTING and p_1 <= self.config.vented_psi:
+        elif (
+            self._state == FluidsStandState.VENTING
+            and p_1 <= self.config.vented_psi
+            # A low loop reads below zero, which says nothing about whether p_1 has vented.
+            and "p_1" not in self.low_loops
+        ):
             self._set_state(FluidsStandState.VENTED)
 
     def _enter_trip(self) -> None:
@@ -485,10 +583,7 @@ class FluidsStand:
                 self._wait.timeout_s is not None
                 and now - self._wait_started > self._wait.timeout_s
             ):
-                self._trip(
-                    f"sequence {name}: timed out waiting for {self._wait.description}"
-                )
-                self._enter_trip()
+                self._fail_sequence(f"timed out waiting for {self._wait.description}")
                 return
             else:
                 return
@@ -499,10 +594,15 @@ class FluidsStand:
             self._end_sequence()
             return
         except InterlockError as error:
-            self._trip(f"sequence {name}: {error}")
-            self._enter_trip()
+            self._fail_sequence(str(error))
             return
         self._begin_wait(wait)
+
+    def _fail_sequence(self, reason: str) -> None:
+        """Stop a sequence that can't go on. Not dangerous, so it warns instead of tripping;
+        closing the sequence lets it return its leg to rest."""
+        self._warn(f"sequence {self.sequence_name} stopped: {reason}")
+        self._end_sequence()
 
     def _begin_wait(self, wait: WaitUntil) -> None:
         self._wait = wait

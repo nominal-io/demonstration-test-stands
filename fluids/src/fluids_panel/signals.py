@@ -106,6 +106,17 @@ def eng_to_ma(signal: Signal, value: float) -> float:
     return min(max(ma, LOOP_MIN_MA), LOOP_MAX_MA)
 
 
+def is_loop_under(ma: float) -> bool:
+    """Whether a loop current is in the NAMUR NE 43 low failure band: a broken wire or dead sensor."""
+    return ma < LOOP_FAULT_LOW_MA
+
+
+def is_loop_over(ma: float) -> bool:
+    """Whether a loop current is in the NAMUR NE 43 high failure band: a shorted or failed-high
+    transmitter, or a process value far enough past full scale to saturate it."""
+    return ma > LOOP_FAULT_HIGH_MA
+
+
 def is_loop_fault(ma: float) -> bool:
     """Whether a loop current is outside the NAMUR NE 43 valid band (broken wire, failed sensor)."""
-    return ma < LOOP_FAULT_LOW_MA or ma > LOOP_FAULT_HIGH_MA
+    return is_loop_under(ma) or is_loop_over(ma)

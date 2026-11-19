@@ -1,6 +1,7 @@
 """Turn Connect message-bus messages into stand commands.
 
-Canvas nodes and buttons send `on_click_action` messages on COMMAND_TOPIC. Connect adds
+Canvas nodes and buttons send `on_click_action` messages on their tab's command topic (see
+`namespaces.py`). Connect adds
 `widget_id` and `node_id`, which are ignored; every message names what it wants explicitly:
 
     {action: toggle, target: supply | pump_1 | v_1 | v_3 | v_5}
@@ -26,8 +27,6 @@ from fluids_panel import sequences
 from fluids_panel.stand import FluidsStand, FluidsStandState, InterlockError
 
 logger = logging.getLogger(__name__)
-
-COMMAND_TOPIC = "script/fluids/cmd"
 
 _ALWAYS_ALLOWED = ("vent", "abort", "reset")
 _SUPPLY_TARGETS = ("supply", "pump_1", "v_1")

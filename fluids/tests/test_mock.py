@@ -4,7 +4,13 @@ import pytest
 from conftest import FakeClock
 
 from fluids_panel.mock import MockBackend, MockParams
-from fluids_panel.signals import SIGNALS_BY_REF, eng_to_ma, is_loop_fault, ma_to_eng
+from fluids_panel.signals import (
+    SIGNALS_BY_REF,
+    eng_to_ma,
+    is_loop_fault,
+    is_loop_over,
+    ma_to_eng,
+)
 
 
 @pytest.fixture
@@ -198,6 +204,19 @@ def test_broken_wire_reads_open_loop(mock, clock):
 
 def test_broken_wire_must_be_an_input(mock, clock):
     mock.faults.broken_wires.add("v_1")
+    with pytest.raises(ValueError):
+        run(mock, clock, 0.1)
+
+
+def test_shorted_loop_reads_high_failure_signal(mock, clock):
+    mock.faults.shorted_loops.add("p_2")
+    inputs = run(mock, clock, 0.1)
+    assert is_loop_over(inputs["p_2"])
+
+
+@pytest.mark.parametrize("ref", ["v_1", "sw_1"])
+def test_shorted_loop_must_be_an_analog_input(mock, clock, ref):
+    mock.faults.shorted_loops.add(ref)
     with pytest.raises(ValueError):
         run(mock, clock, 0.1)
 

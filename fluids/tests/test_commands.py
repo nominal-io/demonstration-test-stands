@@ -176,3 +176,8 @@ def test_build_stand_defaults_to_mock():
 def test_build_stand_rejects_unknown_backend():
     with pytest.raises(ValueError):
         build_stand("daqmx")
+
+
+def test_build_stand_needs_a_client_for_the_daq():
+    with pytest.raises(ValueError, match="client"):
+        build_stand("daq")

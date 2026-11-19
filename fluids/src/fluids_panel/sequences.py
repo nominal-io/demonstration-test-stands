@@ -3,7 +3,11 @@
 Each sequence is a generator: it issues stand commands, then yields a WaitUntil to pause until
 the panel responds. Start one with `start(stand, name, **kwargs)`: its first step runs
 immediately (so a refused first command raises to the caller), then it advances once per
-`stand.update()`. After that, a refused command or a timed-out wait trips the stand.
+`stand.update()`. After that, a refused command or a timed-out wait stops the sequence with a
+warning; it doesn't trip, because not reaching a setpoint isn't dangerous.
+
+Each sequence returns its leg to rest in a `finally`, so the leg is left idle however the
+sequence ends: completed, stopped by a failure, or aborted (closing the generator runs it).
 """
 
 import logging
@@ -26,38 +30,44 @@ def startup(stand: FluidsStand) -> Sequence:
 
 def flow(stand: FluidsStand, lpm: float = 7.8, hold_s: float = 10.0) -> Sequence:
     """Flow control steps 2.1-2.4: command v_2, confirm on fm_1, hold, then close v_2."""
-    stand.set_flow(lpm)
-    tolerance = max(0.1 * lpm, stand.config.flowing_lpm)
-    yield WaitUntil(
-        f"fm_1 to reach {lpm:g} L/min",
-        lambda: abs(stand.fm_1_lpm - lpm) <= tolerance,
-        timeout_s=15.0,
-    )
-    yield stand.wait(hold_s)
-    stand.set_flow(0.0)
-    yield WaitUntil(
-        "fm_1 to stop flowing",
-        lambda: stand.fm_1_lpm < stand.config.flowing_lpm,
-        timeout_s=15.0,
-    )
+    try:
+        stand.set_flow(lpm)
+        tolerance = max(0.1 * lpm, stand.config.flowing_lpm)
+        yield WaitUntil(
+            f"fm_1 to reach {lpm:g} L/min",
+            lambda: abs(stand.fm_1_lpm - lpm) <= tolerance,
+            timeout_s=15.0,
+        )
+        yield stand.wait(hold_s)
+        stand.set_flow(0.0)
+        yield WaitUntil(
+            "fm_1 to stop flowing",
+            lambda: stand.fm_1_lpm < stand.config.flowing_lpm,
+            timeout_s=15.0,
+        )
+    finally:
+        stand.set_flow(0.0)
 
 
 def actuate(stand: FluidsStand, cycles: int = 1) -> Sequence:
     """Linear actuation steps 3.1-3.5: extend to sw_2, retract to sw_1, `cycles` times."""
     timeout_s = stand.config.actuator_timeout_s + 1.0
-    for _ in range(int(cycles)):
-        stand.extend()
-        yield WaitUntil(
-            "sw_2 (extended)",
-            lambda: bool(stand.sw_2.measured and not stand.sw_1.measured),
-            timeout_s=timeout_s,
-        )
+    try:
+        for _ in range(int(cycles)):
+            stand.extend()
+            yield WaitUntil(
+                "sw_2 (extended)",
+                lambda: bool(stand.sw_2.measured and not stand.sw_1.measured),
+                timeout_s=timeout_s,
+            )
+            stand.retract()
+            yield WaitUntil(
+                "sw_1 (retracted)",
+                lambda: bool(stand.sw_1.measured and not stand.sw_2.measured),
+                timeout_s=timeout_s,
+            )
+    finally:
         stand.retract()
-        yield WaitUntil(
-            "sw_1 (retracted)",
-            lambda: bool(stand.sw_1.measured and not stand.sw_2.measured),
-            timeout_s=timeout_s,
-        )
 
 
 def proof_leak(
@@ -68,52 +78,59 @@ def proof_leak(
     Ends by venting the vessel back through pr_2 rather than holding pressure behind a closed
     v_5, so the leg is left in its default state, as the shutdown sequence expects.
     """
-    stand.isolate_vessel(False)
-    stand.set_vessel_pressure(psig)
-    yield WaitUntil(
-        f"p_2 to settle at {psig:g} psi",
-        # pr_2 can only deliver what the supply gives it.
-        lambda: abs(stand.p_2_psi - min(psig, stand.p_1_psi)) <= 1.0,
-        timeout_s=60.0,
-    )
+    try:
+        stand.isolate_vessel(False)
+        stand.set_vessel_pressure(psig)
+        yield WaitUntil(
+            f"p_2 to settle at {psig:g} psi",
+            # pr_2 can only deliver what the supply gives it.
+            lambda: abs(stand.p_2_psi - min(psig, stand.p_1_psi)) <= 1.0,
+            timeout_s=60.0,
+        )
 
-    stand.isolate_vessel(True)
-    start_psi = stand.p_2_psi
-    start_s = stand.now()
-    yield stand.wait(hold_s)
-    elapsed_min = (stand.now() - start_s) / 60.0
-    stand.leak_rate_psi_min = (start_psi - stand.p_2_psi) / elapsed_min
-    logger.info("proof_leak: p_2 leak rate %.2f psi/min", stand.leak_rate_psi_min)
+        stand.isolate_vessel(True)
+        start_psi = stand.p_2_psi
+        start_s = stand.now()
+        yield stand.wait(hold_s)
+        elapsed_min = (stand.now() - start_s) / 60.0
+        stand.leak_rate_psi_min = (start_psi - stand.p_2_psi) / elapsed_min
+        logger.info("proof_leak: p_2 leak rate %.2f psi/min", stand.leak_rate_psi_min)
 
-    stand.set_vessel_pressure(0.0)
-    stand.isolate_vessel(False)
-    yield WaitUntil(
-        "p_2 to vent",
-        lambda: stand.p_2_psi <= stand.config.vented_psi,
-        timeout_s=60.0,
-    )
+        stand.set_vessel_pressure(0.0)
+        stand.isolate_vessel(False)
+        yield WaitUntil(
+            "p_2 to vent",
+            lambda: stand.p_2_psi <= stand.config.vented_psi,
+            timeout_s=60.0,
+        )
+    finally:
+        stand.set_vessel_pressure(0.0)
+        stand.isolate_vessel(False)
 
 
 def shutdown(stand: FluidsStand) -> Sequence:
     """Shutdown steps 5.1-5.5: legs to default, compressor off, vent the supply."""
-    stand.set_flow(0.0)
-    stand.retract()
-    stand.set_vessel_pressure(0.0)
-    stand.isolate_vessel(False)
-    if stand.state == FluidsStandState.READY:
+    try:
+        stand.set_flow(0.0)
+        stand.retract()
+        stand.set_vessel_pressure(0.0)
+        stand.isolate_vessel(False)
+        if stand.state == FluidsStandState.READY:
+            yield WaitUntil(
+                "the legs to idle",
+                lambda: bool(
+                    stand.fm_1_lpm < stand.config.flowing_lpm and stand.sw_1.measured
+                ),
+                timeout_s=stand.config.actuator_timeout_s + 1.0,
+            )
+        stand.vent()
         yield WaitUntil(
-            "the legs to idle",
-            lambda: bool(
-                stand.fm_1_lpm < stand.config.flowing_lpm and stand.sw_1.measured
-            ),
-            timeout_s=stand.config.actuator_timeout_s + 1.0,
+            "p_1 to vent",
+            lambda: stand.state == FluidsStandState.VENTED,
+            timeout_s=60.0,
         )
-    stand.vent()
-    yield WaitUntil(
-        "p_1 to vent",
-        lambda: stand.state == FluidsStandState.VENTED,
-        timeout_s=60.0,
-    )
+    finally:
+        stand.vent()  # however shutdown ends, the supply is left venting
     logger.info(
         "shutdown: open the compressor's drain valve to bleed moisture (step 5.4)"
     )
