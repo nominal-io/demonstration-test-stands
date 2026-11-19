@@ -11,7 +11,17 @@ streaming:
   timeline: null
   playback_speed: null
   window: null
-  persistence: []
+  persistence:
+  - enabled: 'true'
+    data_source_rid: ri.catalog.cerulean-staging.dataset.833d0c96-bfbc-4f24-bcbe-41ae4f06be20
+    file_path: null
+    streams:
+      - id: fluids
+        tags: {}
+      - id: fluids_hw
+        tags: {}
+      - id: fluids_daq
+        tags: {}
   channels:
   - channel: fluids.actuator.state
   - channel: fluids.fm_1
